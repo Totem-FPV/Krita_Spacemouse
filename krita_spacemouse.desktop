@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Service
+ServiceTypes=Krita/PythonPlugin
+X-KDE-Library=krita_spacemouse
+X-Krita-File=krita_scapemouse
+X-Python-2-Compatible=false
+Name=Spacemouse Plugin
+Comment=3D Connexion Spacemouse support for Krita
