@@ -18,9 +18,9 @@ Aimed primarily at the SpaceMouse Enterprise and its generous array of 31 button
 ## Curves Tab
 ![Curves Tab](krita_spacemouse/images/Krita_Spacemouse_Curves_Tab.png)
 
-Each of the canvas' 4 axes of motion can be independently tweaked to feel just as you would like. Allow quick jumps around the canvas while maintaining precise control near center stick, or opt for a linear response from near to far. The choice is yours!
+- Each of the canvas' 4 axes of motion can be independently tweaked to feel just as you would like. Allow quick jumps around the canvas while maintaining precise control near center stick, or opt for a linear response from center to edge. The choice is yours!
 
-Bundled with 5 predefined presets (Linear, Ease-In, Ease-Out, Ease-In-Out, and Steep), and providing saveable user definable profiles, the perfect feel for canvas navigation is always at your fingertips. Settings persist across sessions, allowing you to jump right back into your work after restarting Krita.
+- Bundled with 5 predefined presets (Linear, Ease-In, Ease-Out, Ease-In-Out, and Steep), and providing saveable user definable profiles, the perfect feel for canvas navigation is always at your fingertips. Settings persist across sessions, allowing you to jump right back into your work after restarting Krita.
 
 ## Buttons Tab
 ![Buttons Tab](krita_spacemouse/images/Krita_Spacemouse_Buttons_Tab.png)
@@ -45,7 +45,7 @@ Bundled with 5 predefined presets (Linear, Ease-In, Ease-Out, Ease-In-Out, and S
 
 ## Additional Features
 
-Q- uick-View button feature (Buttons V1-V3 by default) allows for quickly storing and retrieving up to 3 canvas views. Save your current view (including canvas Location, Rotation and Zoom level) and return at the touch of a button. Jump between your current point of focus and your reference image, or bounce between details and full face or character views instantly.
+- Quick-View button feature (Buttons V1-V3 by default) allows for quickly storing and retrieving up to 3 canvas views. Save your current view (including canvas Location, Rotation and Zoom level) and return at the touch of a button. Jump between your current point of focus and your reference image, or bounce between details and full face or character views instantly.
 
 - Mappable modifier keys: Even your valuable modifier keys can be remapped exactly as you'd like. Don't like the feel of the Shift button? Move its functionality exactly where it feels natural to you.
 
