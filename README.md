@@ -1,18 +1,18 @@
 # Krita SpaceMouse Plugin
 ![Krita SpaceMouse](krita_spacemouse/images/Krita_Spacemouse_Full_View.png)
 
-A feature-rich plugin for integrating SpaceMouse functionality with Krita under Linux.
+- A feature-rich plugin for integrating SpaceMouse functionality with Krita under Linux.
 
-Leveraging the SpaceMouse's powerful 6 axis joystick and compact array of buttons, Krita_SpaceMouse seeks to fully eliminate the need for a keyboard from the user's desktop, allowing you to focus on what really matters: Your Art.
+- Leveraging the SpaceMouse's powerful 6 axis joystick and compact array of buttons, Krita_SpaceMouse seeks to fully eliminate the need for a keyboard from the user's desktop, allowing you to focus on what really matters: Your Art.
 
-Aimed primarily at the SpaceMouse Enterprise and its generous array of 31 buttons, Krita_SpaceMouse allows binding of keys to an overwhelming number of Krita's internal actions. Other SpaceMouse models should benefit from this plugin, though at a reduced functionality due to the limited number of buttons.
+- Aimed primarily at the SpaceMouse Enterprise and its generous array of 31 buttons, Krita_SpaceMouse allows binding of keys to an overwhelming number of Krita's internal actions. Other SpaceMouse models should benefit from this plugin, though at a reduced functionality due to the limited number of buttons.
 
 ## Features
 - Allowing independent configuration of the SpaceMouse's 6 axes, each of Krita's canvas motion axes (X, Y, Zoom and Rotate) can be assigned exactly as you like, allowing for a smooth, dynamic, and intuitive experience custom tailored to your workflow. 
 
 - Modifier keys expand the SpaceMouse Enterprise's 31 buttons into a nearly endless array of custom functionality.
 
-- Configuration is achieved through a convenient re-scaleable docker that allows you to see your changes instantly on the canvas. No need to navigate through pesky menus to make quick changes.
+- Configuration is achieved through a convenient re-scaleable docker that allows you to see your changes instantly on the canvas. No need to navigate through complex menus to make quick changes.
 
 ## Docker Overview
 ## Curves Tab
