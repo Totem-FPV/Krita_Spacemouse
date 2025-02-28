@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QComboBox, QLabel, QSlider
 from PyQt5.QtCore import Qt
-from ..utils import debug_print  # Fixed from ...utils to ..utils
+from ..utils import debug_print
 
 class AdvancedTab(QWidget):
     def __init__(self, parent):
@@ -9,7 +9,7 @@ class AdvancedTab(QWidget):
         self.layout = QVBoxLayout()
 
         self.debug_level = QComboBox()
-        self.debug_level.addItems(["0 - None", "1 - Minimal", "2 - Verbose", "3 - Debug", "4 - Full"])
+        self.debug_level.addItems(["0 - None", "1 - Minimal", "2 - Verbose", "3 - Debug", "4 - Full", "5 - Memory"])
         self.debug_level.currentIndexChanged.connect(self.parent.update_debug_level)
         self.layout.addWidget(QLabel("Debug Logging Level:"))
         self.layout.addWidget(self.debug_level)

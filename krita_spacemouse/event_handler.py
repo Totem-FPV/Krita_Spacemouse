@@ -1,5 +1,5 @@
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QMdiArea, QScrollBar
+from PyQt5.QtWidgets import QMdiArea, QScrollBar, QAbstractScrollArea
 from krita import Krita
 from .spnav import libspnav, SPNAV_EVENT_MOTION, SPNAV_EVENT_BUTTON
 from .utils import debug_print
@@ -7,6 +7,7 @@ import ctypes
 from time import time
 import pyautogui
 import os
+import math
 
 def poll_spacenav(self):
     try:
@@ -100,33 +101,56 @@ def poll_spacenav(self):
                             debug_print("Not enough recent presets to toggle", 1, debug_level=docker.debug_level_value)
                     elif action_name in ["Toggle V1", "Toggle V2", "Toggle V3"]:
                         view_key = action_name.split()[1]
+                        qwin = window.qwindow()
+                        subwindow = qwin.findChild(QMdiArea).currentSubWindow()
+                        if not subwindow:
+                            debug_print(f"No subwindow for {view_key}", 5, debug_level=docker.debug_level_value)
+                            continue
+                        canvas_widget = subwindow.widget()
+                        if not canvas_widget:
+                            debug_print(f"No canvas widget for {view_key}", 5, debug_level=docker.debug_level_value)
+                            continue
+                        scroll_area = canvas_widget.findChild(QAbstractScrollArea)
+                        if not scroll_area:
+                            debug_print(f"No scroll area for {view_key}", 5, debug_level=docker.debug_level_value)
+                            continue
+                        hscroll = scroll_area.horizontalScrollBar()
+                        vscroll = scroll_area.verticalScrollBar()
+                        if not (hscroll and vscroll):
+                            debug_print(f"Scrollbars missing for {view_key}", 5, debug_level=docker.debug_level_value)
+                            continue
                         if modifier_key == "Shift":
-                            hscroll = canvas.view().horizontalScrollBar()
-                            vscroll = canvas.view().verticalScrollBar()
-                            x = hscroll.value() if hscroll else 0
-                            y = vscroll.value() if vscroll else 0
-                            zoom = view.zoomLevel()
+                            x = hscroll.value()
+                            y = vscroll.value()
+                            zoom = canvas.zoomLevel()
                             rotation = canvas.rotation()
                             self.view_states[view_key] = (x, y, zoom, rotation)
-                            debug_print(f"Saved view {view_key}: x={x}, y={y}, zoom={zoom}, rotation={rotation}", 1, debug_level=docker.debug_level_value)
-                        elif self.view_states[view_key]:
+                            debug_print(f"Saved view {view_key}: x={x}, y={y}, zoom={zoom}, rotation={rotation}", 5, debug_level=docker.debug_level_value)
+                        elif self.view_states.get(view_key):
                             x, y, zoom, rotation = self.view_states[view_key]
-                            hscroll = canvas.view().horizontalScrollBar()
-                            vscroll = canvas.view().verticalScrollBar()
-                            if hscroll and vscroll:
+                            current_x = hscroll.value()
+                            current_y = vscroll.value()
+                            current_zoom = canvas.zoomLevel()
+                            current_rotation = canvas.rotation()
+                            if (abs(current_x - x) > 1 or abs(current_y - y) > 1 or
+                                abs(current_zoom - zoom) > 0.01 or abs(current_rotation - rotation) > 0.1):
                                 hscroll.setValue(x)
                                 vscroll.setValue(y)
-                            view.setZoomLevel(zoom)
-                            canvas.setRotation(rotation)
-                            debug_print(f"Recalled view {view_key}: x={x}, y={y}, zoom={zoom}, rotation={rotation}", 1, debug_level=docker.debug_level_value)
+                                canvas.setZoomLevel(zoom)
+                                canvas.setRotation(rotation)
+                                debug_print(f"Recalled view {view_key}: x={x}, y={y}, zoom={zoom}, rotation={rotation}", 5, debug_level=docker.debug_level_value)
+                            else:
+                                debug_print(f"View {view_key} already at saved state: x={current_x}, y={current_y}, zoom={current_zoom}, rotation={current_rotation}", 5, debug_level=docker.debug_level_value)
+                            libspnav.spnav_remove_events(SPNAV_EVENT_MOTION)
+                            continue
                         else:
-                            debug_print(f"No view saved for {view_key}", 1, debug_level=docker.debug_level_value)
+                            debug_print(f"No view saved for {view_key}", 5, debug_level=docker.debug_level_value)
                     else:
                         action = Krita.instance().action(action_name)
                         if action:
                             action.trigger()
                             debug_print(f"Triggered action: {action_name}", 4, debug_level=docker.debug_level_value)
-                            libspnav.spnav_remove_events(SPNAV_EVENT_MOTION)  # Clear queue after action
+                            libspnav.spnav_remove_events(SPNAV_EVENT_MOTION)
                         else:
                             debug_print(f"Action {action_name} not found", 1, debug_level=docker.debug_level_value)
             elif self.event.type == SPNAV_EVENT_MOTION:
@@ -146,7 +170,6 @@ def poll_spacenav(self):
         if num_events > 0:
             debug_print("Polling SpaceNavigator...", 2, debug_level=docker.debug_level_value)
             debug_print(f"Number of events: {num_events}", 2, debug_level=docker.debug_level_value)
-
             self.last_motion_data = latest_inputs
             if self.last_logged_motion != self.last_motion_data:
                 debug_print(f"Motion data stored: {self.last_motion_data}", 2, debug_level=docker.debug_level_value)
@@ -238,7 +261,7 @@ def poll_spacenav(self):
                 vscroll.setValue(vscroll.value() + dy)
                 debug_print(f"Panned: dx={dx}, dy={dy}, hscroll={old_h}->{hscroll.value()}, vscroll={old_v}->{vscroll.value()}, modifiers={modifiers}", 1, debug_level=docker.debug_level_value)
                 self.last_dx, self.last_dy = dx, dy
-                libspnav.spnav_remove_events(SPNAV_EVENT_MOTION)  # Clear queue after pan
+                libspnav.spnav_remove_events(SPNAV_EVENT_MOTION)
 
             if zoom_delta != 0:
                 zoom_action = "view_zoom_in" if zoom_delta > 0 else "view_zoom_out"
@@ -249,7 +272,7 @@ def poll_spacenav(self):
                         action.trigger()
                     debug_print(f"Zoomed {'in' if zoom_delta > 0 else 'out'} by {steps} steps, delta={zoom_delta}", 1, debug_level=docker.debug_level_value)
                     self.last_zoom_delta = zoom_delta
-                    libspnav.spnav_remove_events(SPNAV_EVENT_MOTION)  # Clear queue after zoom
+                    libspnav.spnav_remove_events(SPNAV_EVENT_MOTION)
                 else:
                     debug_print(f"Zoom action {zoom_action} not found", 1, debug_level=docker.debug_level_value)
 
@@ -259,19 +282,13 @@ def poll_spacenav(self):
                 canvas.setRotation(new_rotation)
                 debug_print(f"Rotated to: {new_rotation}, modifiers={modifiers}", 1, debug_level=docker.debug_level_value)
                 self.last_rotation_delta = rotation_delta
-                libspnav.spnav_remove_events(SPNAV_EVENT_MOTION)  # Clear queue after rotation
+                libspnav.spnav_remove_events(SPNAV_EVENT_MOTION)
 
             if num_events > 5:
                 cleared = libspnav.spnav_remove_events(SPNAV_EVENT_MOTION)
                 debug_print(f"Cleared {cleared} motion events after {num_events} processed", 1, debug_level=docker.debug_level_value)
 
-        if (current_time - self.last_motion_time > self.debounce_ms and
-            (self.last_dx or self.last_dy or self.last_zoom_delta or self.last_rotation_delta)):
-            self.last_dx = self.last_dy = self.last_zoom_delta = self.last_rotation_delta = 0
-            self.last_motion_data = {"x": 0, "y": 0, "z": 0, "rx": 0, "ry": 0, "rz": 0}
-            cleared_motion = libspnav.spnav_remove_events(SPNAV_EVENT_MOTION)
-            cleared_button = libspnav.spnav_remove_events(SPNAV_EVENT_BUTTON)
-            debug_print(f"No new events, reset motion, cleared {cleared_motion} motion events, {cleared_button} button events", 1, debug_level=docker.debug_level_value)
+        self.last_motion_time = current_time
 
     except OSError as e:
         debug_print(f"Socket error in poll: {e}", 1, debug_level=self.docker.debug_level_value if self.docker else 1)
@@ -283,17 +300,17 @@ def poll_spacenav(self):
         self.timer.stop()
 
 def update_lcd_buttons(self):
-    if not self.docker or not self.lcd_fd:
-        return
-    mappings = self.docker.settings.button_mappings
-    lines = [f"{i}: {mappings.get(str(i), {'None': 'None'}).get('None', 'None')[:10]}" for i in range(12)]
-    svg_text = "\n".join(f'<text x="10" y="{30 + i*20}" font-size="18" fill="white">{line}</text>' for i, line in enumerate(lines))
-    svg = f"""<svg width="320" height="240" xmlns="http://www.w3.org/2000/svg">
-                <rect x="0" y="0" width="320" height="240" fill="black"/>
-                {svg_text}
-              </svg>""".encode()
-    packet = bytearray([0x03]) + svg[:63] + b'\x00' * (64 - len(svg[:63]))
     try:
+        if not self.docker or not self.lcd_fd:
+            return
+        mappings = self.docker.settings.button_mappings
+        lines = [f"{i}: {mappings.get(str(i), {'None': 'None'}).get('None', 'None')[:10]}" for i in range(12)]
+        svg_text = "\n".join(f'<text x="10" y="{30 + i*20}" font-size="18" fill="white">{line}</text>' for i, line in enumerate(lines))
+        svg = f"""<svg width="320" height="240" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="0" y="0" width="320" height="240" fill="black"/>
+                    {svg_text}
+                  </svg>""".encode()
+        packet = bytearray([0x03]) + svg[:63] + b'\x00' * (64 - len(svg[:63]))
         os.write(self.lcd_fd, packet)
         debug_print("LCD: Updated buttons 0-11", 1, debug_level=self.docker.debug_level_value if self.docker else 1)
     except OSError as e:

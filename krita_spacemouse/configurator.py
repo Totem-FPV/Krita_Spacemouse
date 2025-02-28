@@ -1,6 +1,6 @@
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QComboBox, QLabel, QPushButton, QGridLayout, QInputDialog, QDoubleSpinBox, QSpinBox, QCheckBox, QHBoxLayout, QWidget, QMenu, QLineEdit, QScrollArea  # Added QWidget
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QComboBox, QLabel, QPushButton, QGridLayout, QInputDialog, QDoubleSpinBox, QSpinBox, QCheckBox, QHBoxLayout, QWidget, QMenu, QLineEdit, QScrollArea
 from PyQt5.QtCore import pyqtSlot, Qt, QPoint, QSize, QTimer
-from PyQt5.QtGui import QIcon, QPixmap, QColor, QPainter  # Added QPainter for fallback
+from PyQt5.QtGui import QIcon, QPixmap, QColor, QPainter
 from .utils import debug_print
 from krita import Krita
 
@@ -51,7 +51,7 @@ class BrushPresetPopup(QWidget):
             preset_name_clean = preset_name.strip()
             pixmap = QPixmap.fromImage(preset.image()) if preset.image() and not preset.image().isNull() else QPixmap(64, 64)
             if pixmap.isNull():
-                pixmap.fill(QColor(200, 200, 200))  # Fallback grey square
+                pixmap.fill(QColor(200, 200, 200))
                 painter = QPainter(pixmap)
                 painter.drawText(5, 32, "No Img")
                 painter.end()
@@ -80,6 +80,15 @@ class ConfigDialogs:
         self.axis_controls = {}
         self.button_id = None
         self.axis_labels = {}
+        self.axis_indicators = {}
+        self.axis_colors = {
+            "X": "red",
+            "Y": "green",
+            "Z": "blue",
+            "RX": "yellow",  # Tilt L/R, Pan Y
+            "RY": "purple",  # Twist, Rotation
+            "RZ": "orange"   # Tilt F/B, Pan X
+        }
 
     def show_button_config(self, button_id):
         self.button_id = button_id
@@ -192,7 +201,7 @@ class ConfigDialogs:
 
         self.timer = QTimer(self.parent)
         self.timer.timeout.connect(self.update_axis_colors)
-        self.timer.start(100)
+        self.timer.start(200)
         debug_print("Timer started for axis color updates", 1, debug_level=self.parent.debug_level_value)
 
         for axis in spnav_axes:
@@ -206,9 +215,16 @@ class ConfigDialogs:
         for i, axis in enumerate(spnav_axes):
             axis_layout = QVBoxLayout()
             axis_layout.setSpacing(5)
+
+            indicator_widget = QWidget()
+            indicator_layout = QVBoxLayout(indicator_widget)
+            indicator_layout.setContentsMargins(0, 0, 0, 0)
             label = QLabel(f"{axis} Axis:")
-            label.setStyleSheet("font-weight: bold;")
+            label.setStyleSheet("font-weight: bold; color: black;")
+            indicator_layout.addWidget(label)
             self.axis_labels[axis] = label
+            self.axis_indicators[axis] = indicator_widget
+
             action_btn = QPushButton("Select Action")
             action_menu = QMenu(action_btn)
 
@@ -235,7 +251,7 @@ class ConfigDialogs:
             self._update_advanced_settings(axis, self.parent.settings.puck_mappings.get(axis, "None"), settings_layout)
             action_menu.triggered.connect(lambda: self._update_advanced_settings(axis, self.parent.settings.puck_mappings.get(axis, "None"), settings_layout))
 
-            axis_layout.addWidget(label)
+            axis_layout.addWidget(indicator_widget)
             axis_layout.addWidget(QLabel("Map to:"))
             axis_layout.addWidget(action_btn)
             axis_layout.addWidget(QLabel("With:"))
@@ -282,29 +298,26 @@ class ConfigDialogs:
             debug_print("No extension or motion data available", 1, debug_level=self.parent.debug_level_value)
             return
         motion_data = self.parent.extension.last_motion_data
-        debug_print(f"Updating axis colors with motion data: {motion_data}", 2, debug_level=self.parent.debug_level_value)
-        for axis, label in self.axis_labels.items():
+        debug_print(f"Updating axis colors with motion_data: {motion_data}", 2, debug_level=self.parent.debug_level_value)
+
+        # Find the axis with the strongest input
+        max_axis = None
+        max_value = 100  # Raised from 50 to 100
+        for axis in self.axis_colors:
+            value = abs(motion_data.get(axis.lower(), 0))
+            if value > max_value:
+                max_value = value
+                max_axis = axis
+
+        for axis, indicator in self.axis_indicators.items():
             value = motion_data.get(axis.lower(), 0)
-            action = self.parent.settings.puck_mappings.get(axis, "None")
-            if action != "None":
-                canvas_axis = action.split()[0]
-                if canvas_axis == "Pan" and "Horizontal" in action:
-                    canvas_axis = "X"
-                elif canvas_axis == "Pan" and "Vertical" in action:
-                    canvas_axis = "Y"
-                full_axis = f"{canvas_axis} (Panning Horizontal)" if canvas_axis == "X" else f"{canvas_axis} (Panning Vertical)" if canvas_axis == "Y" else canvas_axis
-                dead_zone = self.parent.settings.axis_settings.get(full_axis, {}).get("dead_zone", 0)
+            debug_print(f"Axis {axis}: raw_value={value}", 3, debug_level=self.parent.debug_level_value)
+            if max_axis is None or abs(value) <= 100:
+                indicator.setStyleSheet("background: transparent;")
+            elif axis == max_axis:
+                indicator.setStyleSheet(f"background: {self.axis_colors[axis]};")
             else:
-                dead_zone = 0
-            max_input = 500
-            intensity = min(abs(value) / (max_input - dead_zone), 1.0) if abs(value) > dead_zone else 0
-            if value > 0:
-                color = QColor(0, int(255 * intensity), 0)
-            elif value < 0:
-                color = QColor(int(255 * intensity), 0, 0)
-            else:
-                color = QColor(0, 0, 0)
-            label.setStyleSheet(f"font-weight: bold; color: {color.name()};")
+                indicator.setStyleSheet(f"background: {self.axis_colors[axis]}; opacity: 0.3;")
 
     @pyqtSlot(str)
     def _update_advanced_settings(self, axis, action, settings_layout):
