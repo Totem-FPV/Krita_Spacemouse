@@ -17,8 +17,9 @@ class SettingsManager:
                 "16": {"None": "rotate_canvas_left"}, "17": {"None": "rotate_canvas_right"}, "18": {"None": "invert_selection"},
                 "19": {"None": "Alt"}, "20": {"None": "Shift"}, "21": {"None": "Ctrl"}, "22": {"None": "None"},
                 "23": {"None": "select_all"}, "24": {"None": "edit_cut"}, "25": {"None": "KisToolSelectRectangular"},
-                "26": {"None": "swapForegroundBackground"}, "27": {"None": "Toggle V1"}, "28": {"None": "Toggle V2"},
-                "29": {"None": "Toggle V3"}, "30": {"None": "zoom_to_100pct"}
+                "26": {"None": "swapForegroundBackground"}, "27": {"None": "recall_view_1", "Shift": "store_view_1"},
+                "28": {"None": "recall_view_2", "Shift": "store_view_2"}, "29": {"None": "recall_view_3", "Shift": "store_view_3"},
+                "30": {"None": "zoom_to_100pct"}
             }
         }
         self.puck_mappings = {
@@ -36,7 +37,7 @@ class SettingsManager:
 
         for canvas_axis in ["X (Panning Horizontal)", "Y (Panning Vertical)", "Zoom", "Rotation"]:
             self.axis_settings[canvas_axis] = {
-                "sensitivity": 0.20 if "Panning" in canvas_axis else 0.05 if canvas_axis == "Zoom" else 0.40,
+                "sensitivity": 0.20 if "Panning" in canvas_axis else 0.5 if canvas_axis == "Zoom" else 0.40,  # Updated Zoom sensitivity
                 "dead_zone": 130 if "Panning" in canvas_axis else 10 if canvas_axis == "Zoom" else 250,
                 "invert": True,
                 "binding": self.default_mappings.get(canvas_axis.split()[0], "RZ")
@@ -66,7 +67,7 @@ class SettingsManager:
                     self.axis_settings[canvas_axis]["invert"] = settings.get(f"{axis_key}_invert", True)
                     self.axis_settings[canvas_axis]["binding"] = settings.get(f"{axis_key}_binding", self.default_mappings.get(canvas_axis.split()[0], "RZ"))
 
-                self.parent.debug_level_value = settings.get("debug_level", 1)  # Set from file or default
+                self.parent.debug_level_value = settings.get("debug_level", 1)
                 if hasattr(self.parent, 'advanced_tab'):
                     self.parent.advanced_tab.debug_level.setCurrentIndex(self.parent.debug_level_value)
                     polling_interval = settings.get("polling_interval", 10)

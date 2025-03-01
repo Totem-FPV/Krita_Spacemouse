@@ -63,52 +63,41 @@ def process_button_event(self, button_id, press_state):
                     debug_print(f"Previous preset '{last_preset}' not found", 1, debug_level=docker.debug_level_value)
             else:
                 debug_print("Not enough recent presets to toggle", 1, debug_level=docker.debug_level_value)
-        elif action_name in ["Toggle V1", "Toggle V2", "Toggle V3"]:
-            view_key = action_name.split()[1]
+        elif action_name.startswith("store_view_") or action_name.startswith("recall_view_"):
+            canvas = view.canvas()
             qwin = Krita.instance().activeWindow().qwindow()
             subwindow = qwin.findChild(QMdiArea).currentSubWindow()
             if not subwindow:
-                debug_print(f"No subwindow for {view_key}", 5, debug_level=docker.debug_level_value)
+                debug_print("No subwindow for view action", 1, debug_level=docker.debug_level_value)
                 return
-            canvas_widget = subwindow.widget()
-            if not canvas_widget:
-                debug_print(f"No canvas widget for {view_key}", 5, debug_level=docker.debug_level_value)
-                return
-            scroll_area = canvas_widget.findChild(QAbstractScrollArea)
+            scroll_area = subwindow.widget().findChild(QAbstractScrollArea)
             if not scroll_area:
-                debug_print(f"No scroll area for {view_key}", 5, debug_level=docker.debug_level_value)
+                debug_print("No scroll area for view action", 1, debug_level=docker.debug_level_value)
                 return
             hscroll = scroll_area.horizontalScrollBar()
             vscroll = scroll_area.verticalScrollBar()
             if not (hscroll and vscroll):
-                debug_print(f"Scrollbars missing for {view_key}", 5, debug_level=docker.debug_level_value)
+                debug_print("Scrollbars missing for view action", 1, debug_level=docker.debug_level_value)
                 return
-            canvas = view.canvas()
-            if modifier_key == "Shift":
+
+            view_key = action_name.split("_")[-1]  # "1", "2", "3"
+            if action_name.startswith("store_view_"):
                 x = hscroll.value()
                 y = vscroll.value()
                 zoom = canvas.zoomLevel()
                 rotation = canvas.rotation()
                 self.view_states[view_key] = (x, y, zoom, rotation)
-                debug_print(f"Saved view {view_key}: x={x}, y={y}, zoom={zoom}, rotation={rotation}", 5, debug_level=docker.debug_level_value)
-            elif self.view_states.get(view_key):
-                x, y, zoom, rotation = self.view_states[view_key]
-                current_x = hscroll.value()
-                current_y = vscroll.value()
-                current_zoom = canvas.zoomLevel()
-                current_rotation = canvas.rotation()
-                if (abs(current_x - x) > 1 or abs(current_y - y) > 1 or
-                    abs(current_zoom - zoom) > 0.01 or abs(current_rotation - rotation) > 0.1):
+                debug_print(f"Stored view {view_key}: x={x}, y={y}, zoom={zoom}, rotation={rotation}", 1, debug_level=docker.debug_level_value)
+            elif action_name.startswith("recall_view_"):
+                if self.view_states.get(view_key):
+                    x, y, zoom, rotation = self.view_states[view_key]
                     hscroll.setValue(x)
                     vscroll.setValue(y)
                     canvas.setZoomLevel(zoom)
                     canvas.setRotation(rotation)
-                    debug_print(f"Recalled view {view_key}: x={x}, y={y}, zoom={zoom}, rotation={rotation}", 5, debug_level=docker.debug_level_value)
+                    debug_print(f"Recalled view {view_key}: x={x}, y={y}, zoom={zoom}, rotation={rotation}", 1, debug_level=docker.debug_level_value)
                 else:
-                    debug_print(f"View {view_key} already at saved state", 5, debug_level=docker.debug_level_value)
-                libspnav.spnav_remove_events(SPNAV_EVENT_MOTION)
-            else:
-                debug_print(f"No view saved for {view_key}", 5, debug_level=docker.debug_level_value)
+                    debug_print(f"No view stored for {view_key}", 1, debug_level=docker.debug_level_value)
         else:
             action = Krita.instance().action(action_name)
             if action:

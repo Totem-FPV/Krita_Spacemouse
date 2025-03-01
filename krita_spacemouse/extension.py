@@ -4,7 +4,7 @@ from krita import Extension, Krita, DockWidgetFactory, DockWidgetFactoryBase
 from .spnav import libspnav, SpnavEventWrapper, SPNAV_EVENT_BUTTON, SPNAV_EVENT_MOTION
 from .docker import SpacenavDocker
 from .utils import debug_print
-from .event_handler import poll_spacenav, update_lcd_buttons  # New import
+from .event_handler import poll_spacenav, update_lcd_buttons
 import os
 import ctypes
 
@@ -65,10 +65,10 @@ class SpacenavControlExtension(Extension):
                 debug_print(f"Docker: title={d.windowTitle()}, objectName={d.objectName()}", 3, debug_level=1)
 
     def poll_spacenav(self):
-        poll_spacenav(self)  # Delegate to event_handler.py
+        poll_spacenav(self)
 
     def update_lcd_buttons(self):
-        update_lcd_buttons(self)  # Delegate to event_handler.py
+        update_lcd_buttons(self)
 
     def stop(self):
         try:

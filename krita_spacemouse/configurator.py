@@ -85,9 +85,9 @@ class ConfigDialogs:
             "X": "red",
             "Y": "green",
             "Z": "blue",
-            "RX": "yellow",  # Tilt L/R, Pan Y
-            "RY": "purple",  # Twist, Rotation
-            "RZ": "orange"   # Tilt F/B, Pan X
+            "RX": "yellow",
+            "RY": "purple",
+            "RZ": "orange"
         }
 
     def show_button_config(self, button_id):
@@ -136,6 +136,10 @@ class ConfigDialogs:
         action_menu.addSeparator()
 
         self.parent.buttons_tab.refresh_available_actions()
+        view_actions = ["store_view_1", "recall_view_1", "store_view_2", "recall_view_2", "store_view_3", "recall_view_3"]
+        for view_action in view_actions:
+            if view_action not in self.parent.buttons_tab.available_actions:
+                self.parent.buttons_tab.available_actions.append(view_action)
         debug_print(f"Populating button config with {len(self.parent.buttons_tab.available_actions)} standard actions", 1, debug_level=self.parent.debug_level_value)
 
         categories = {
@@ -145,6 +149,7 @@ class ConfigDialogs:
             "Scripts": ["ai_", "python_", "ten_"],
             "SVG Tools": ["svg_"],
             "Tools": ["tool_", "kis_tool"],
+            "View": ["store_view_", "recall_view_"],  # New category for view actions
             "Other": []
         }
         action_menus = {}
@@ -156,18 +161,17 @@ class ConfigDialogs:
         for action_name in self.parent.buttons_tab.available_actions:
             if action_name == "None":
                 continue
-            qaction = Krita.instance().action(action_name)
-            if qaction:
-                placed = False
-                for cat, prefixes in categories.items():
-                    if cat != "Other" and any(action_name.lower().startswith(prefix.lower()) for prefix in prefixes):
-                        menu_action = action_menus[cat].addAction(qaction.icon(), action_name)
-                        menu_action.triggered.connect(lambda checked, a=action_name: self.update_action(button_id, modifier, a, value_label))
-                        placed = True
-                        break
-                if not placed:
-                    menu_action = action_menus["Other"].addAction(qaction.icon(), action_name)
+            qaction = Krita.instance().action(action_name) if not action_name.startswith(("store_view_", "recall_view_")) else None
+            placed = False
+            for cat, prefixes in categories.items():
+                if cat != "Other" and any(action_name.lower().startswith(prefix.lower()) for prefix in prefixes):
+                    menu_action = action_menus[cat].addAction(qaction.icon() if qaction else QIcon(), action_name)
                     menu_action.triggered.connect(lambda checked, a=action_name: self.update_action(button_id, modifier, a, value_label))
+                    placed = True
+                    break
+            if not placed:
+                menu_action = action_menus["Other"].addAction(qaction.icon() if qaction else QIcon(), action_name)
+                menu_action.triggered.connect(lambda checked, a=action_name: self.update_action(button_id, modifier, a, value_label))
 
         brush_menu = action_menu.addAction("Brush Presets")
         brush_menu.triggered.connect(lambda: self.show_brush_popup(action_menu))
@@ -300,9 +304,8 @@ class ConfigDialogs:
         motion_data = self.parent.extension.last_motion_data
         debug_print(f"Updating axis colors with motion_data: {motion_data}", 2, debug_level=self.parent.debug_level_value)
 
-        # Find the axis with the strongest input
         max_axis = None
-        max_value = 100  # Raised from 50 to 100
+        max_value = 100
         for axis in self.axis_colors:
             value = abs(motion_data.get(axis.lower(), 0))
             if value > max_value:
