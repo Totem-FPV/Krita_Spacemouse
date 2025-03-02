@@ -4,7 +4,7 @@ from .tabs.curves_tab import CurvesTab
 from .tabs.buttons_tab import ButtonsTab
 from .tabs.advanced_tab import AdvancedTab
 from .tabs.log_tab import LogTab
-from .configurator import ConfigDialogs  # Changed from config_dialogs
+from .configurator import ConfigDialogs
 from .settings import SettingsManager
 from .utils import debug_print
 
@@ -20,54 +20,58 @@ class SpacenavDocker(QDockWidget):
         self.layout = QVBoxLayout()
         self.widget.setLayout(self.layout)
 
+        self.debug_level_value = 1  # Set early default
         print("[PRE-INIT 2] debug_level_value set")
-        debug_print("Step 2: debug_level_value set", 1, debug_level=1)
+        debug_print("Step 2: debug_level_value set", 1, debug_level=self.debug_level_value)
 
         try:
             self.settings = SettingsManager(self)
-            debug_print("Step 3: SettingsManager initialized successfully", 1, debug_level=1)
+            debug_print("Step 3: SettingsManager initialized successfully", 1, debug_level=self.debug_level_value)
         except Exception as e:
-            debug_print(f"Step 3: Failed to initialize SettingsManager: {str(e)}", 1, debug_level=1)
+            debug_print(f"Step 3: Failed to initialize SettingsManager: {str(e)}", 1, debug_level=self.debug_level_value, force=True)
             import traceback
-            debug_print(f"Stack trace: {traceback.format_exc()}", 1, debug_level=1)
+            debug_print(f"Stack trace: {traceback.format_exc()}", 1, debug_level=self.debug_level_value, force=True)
             self.settings = None
 
         self.tabs = QTabWidget()
         self.layout.addWidget(self.tabs)
         print("[PRE-INIT 4] Tabs widget added")
-        debug_print("Step 4: Tabs widget added", 1, debug_level=1)
+        debug_print("Step 4: Tabs widget added", 1, debug_level=self.debug_level_value)
 
         self.axis_settings_container = QWidget(self)
         self.axis_settings_container.setLayout(QVBoxLayout())
         self.axis_settings_container.setVisible(False)
 
         self.curves_tab = CurvesTab(self)
-        debug_print("Step 5: CurvesTab initialized", 1, debug_level=1)
+        debug_print("Step 5: CurvesTab initialized", 1, debug_level=self.debug_level_value)
         print("[PRE-INIT 5] Before ButtonsTab")
         self.buttons_tab = ButtonsTab(self)
-        debug_print("Step 6: ButtonsTab initialized", 1, debug_level=1)
+        debug_print("Step 6: ButtonsTab initialized", 1, debug_level=self.debug_level_value)
         self.advanced_tab = AdvancedTab(self)
-        debug_print("Step 7: AdvancedTab initialized", 1, debug_level=1)
+        debug_print("Step 7: AdvancedTab initialized", 1, debug_level=self.debug_level_value)
         self.log_tab = LogTab(self)
         print("[PRE-INIT 6] LogTab initialized")
-        debug_print("Step 8: LogTab initialized", 1, debug_level=1)
+        debug_print("Step 8: LogTab initialized", 1, debug_level=self.debug_level_value)
 
         self.config_dialogs = ConfigDialogs(self)
-        debug_print("Step 9: ConfigDialogs initialized", 1, debug_level=1)
+        debug_print("Step 9: ConfigDialogs initialized", 1, debug_level=self.debug_level_value)
 
         self.tabs.addTab(self.curves_tab, "Curves")
         self.tabs.addTab(self.buttons_tab, "Buttons")
         self.tabs.addTab(self.advanced_tab, "Advanced")
         self.tabs.addTab(self.log_tab, "Log")
-        debug_print("Step 10: Tabs added to QTabWidget", 1, debug_level=1)
+        debug_print("Step 10: Tabs added to QTabWidget", 1, debug_level=self.debug_level_value)
 
         if self.settings:
             self.settings.load_settings()
-            if not hasattr(self, 'debug_level_value'):  # Set default only if not loaded
-                self.debug_level_value = 1
+            # Update debug_level_value from settings if available
+            if hasattr(self.settings, 'parent') and hasattr(self.settings.parent, 'debug_level_value'):
+                self.debug_level_value = self.settings.parent.debug_level_value
             debug_print("Settings loaded after initialization", 1, debug_level=self.debug_level_value)
+        else:
+            debug_print("Settings not initialized, using default debug level", 1, debug_level=self.debug_level_value)
 
-        debug_print("Step 11: SpacenavDocker initialized", 1, debug_level=self.debug_level_value if self.settings else 1)
+        debug_print("Step 11: SpacenavDocker initialized", 1, debug_level=self.debug_level_value)
         print("[PRE-INIT 7] SpacenavDocker initialized")
 
     def button_clicked(self, event):

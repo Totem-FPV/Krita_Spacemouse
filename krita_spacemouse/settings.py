@@ -37,7 +37,7 @@ class SettingsManager:
 
         for canvas_axis in ["X (Panning Horizontal)", "Y (Panning Vertical)", "Zoom", "Rotation"]:
             self.axis_settings[canvas_axis] = {
-                "sensitivity": 0.20 if "Panning" in canvas_axis else 0.5 if canvas_axis == "Zoom" else 0.40,  # Updated Zoom sensitivity
+                "sensitivity": 0.20 if "Panning" in canvas_axis else 0.5 if canvas_axis == "Zoom" else 0.40,
                 "dead_zone": 130 if "Panning" in canvas_axis else 10 if canvas_axis == "Zoom" else 250,
                 "invert": True,
                 "binding": self.default_mappings.get(canvas_axis.split()[0], "RZ")

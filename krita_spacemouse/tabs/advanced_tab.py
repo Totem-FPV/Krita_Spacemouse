@@ -25,4 +25,5 @@ class AdvancedTab(QWidget):
 
         self.layout.addStretch()
         self.setLayout(self.layout)
-        debug_print("AdvancedTab initialized", 1, debug_level=self.parent.debug_level_value)
+        debug_level = getattr(self.parent, 'debug_level_value', 1)  # Default to 1 if not set
+        debug_print("AdvancedTab initialized", 1, debug_level=debug_level)

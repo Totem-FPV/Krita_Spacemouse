@@ -3,7 +3,8 @@ from PyQt5.QtGui import QPixmap, QMouseEvent, QPen, QColor, QPainter
 from PyQt5.QtCore import Qt, QRectF, QEvent
 from krita import Krita
 from ..utils import debug_print
-from ..configurator import SavePresetDialog  # Changed from config_dialogs
+from ..configurator import SavePresetDialog
+from .curves_tab import CurvesTab
 import os
 
 class ButtonsTab(QWidget):
@@ -21,14 +22,14 @@ class ButtonsTab(QWidget):
         image_path = os.path.join(plugin_dir, "images", "spacemouse_enterprise.png")
         self.pixmap = QPixmap(image_path)
         if self.pixmap.isNull():
-            debug_print(f"Failed to load {image_path}", 1, debug_level=self.parent.debug_level_value, force=True)
+            debug_print(f"Failed to load {image_path}", 1, debug_level=1, force=True)
             self.pixmap = QPixmap(640, 480)
             self.pixmap.fill(QColor(200, 200, 200))
             painter = QPainter(self.pixmap)
             painter.drawText(10, 240, "Image Missing")
             painter.end()
         else:
-            debug_print(f"Loaded {image_path} successfully, Size: {self.pixmap.size()}", 1, debug_level=self.parent.debug_level_value, force=True)
+            debug_print(f"Loaded {image_path} successfully, Size: {self.pixmap.size()}", 1, debug_level=1, force=True)
 
         self.scene.clear()
         self.pixmap_item = self.scene.addPixmap(self.pixmap)
@@ -73,7 +74,8 @@ class ButtonsTab(QWidget):
 
         self.preset_layout = QHBoxLayout()
         self.preset_selector = QComboBox()
-        self.preset_selector.addItems(self.parent.settings.button_presets.keys())
+        preset_keys = self.parent.settings.button_presets.keys() if self.parent.settings else ["Default"]
+        self.preset_selector.addItems(preset_keys)
         self.preset_selector.setCurrentText("Default")
         self.preset_selector.currentTextChanged.connect(self.load_preset_mappings)
         self.save_preset_btn = QPushButton("Save Preset")
@@ -98,8 +100,8 @@ class ButtonsTab(QWidget):
         self.setLayout(self.layout)
 
         self.refresh_available_actions()
-        debug_print(f"Available actions initialized with {len(self.available_actions)} items", 1, debug_level=self.parent.debug_level_value)
-        debug_print("ButtonsTab initialized", 1, debug_level=self.parent.debug_level_value)
+        debug_print(f"Available actions initialized with {len(self.available_actions)} items", 1, debug_level=self.parent.debug_level_value if self.parent.settings else 1)
+        debug_print("ButtonsTab initialized", 1, debug_level=self.parent.debug_level_value if self.parent.settings else 1)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -128,7 +130,7 @@ class ButtonsTab(QWidget):
                 if scaled_rect.contains(pos):
                     if isinstance(button_id, int):
                         btn_id_str = str(button_id)
-                        mappings = self.parent.settings.button_mappings.get(btn_id_str, {"None": "None"})
+                        mappings = self.parent.settings.button_mappings.get(btn_id_str, {"None": "None"}) if self.parent.settings else {"None": "None"}
                         tooltip = f"{self.button_labels_map[btn_id_str]}:\n"
                         for mod in ["None", "Shift", "Ctrl", "Alt"]:
                             action = mappings.get(mod, "None")
@@ -154,16 +156,16 @@ class ButtonsTab(QWidget):
                     self.parent.config_dialogs.show_button_config(button_id)
                 else:
                     self.parent.config_dialogs.show_puck_config()
-                debug_print(f"Clicked {button_id} at {pos} (scaled rect: {scaled_rect.x()},{scaled_rect.y()},{scaled_rect.width()}x{scaled_rect.height()})", 2, debug_level=self.parent.debug_level_value)
+                debug_print(f"Clicked {button_id} at {pos} (scaled rect: {scaled_rect.x()},{scaled_rect.y()},{scaled_rect.width()}x{scaled_rect.height()})", 2, debug_level=self.parent.debug_level_value if self.parent.settings else 1)
                 break
         else:
-            debug_print(f"No hotspot hit at {pos} (viewport: {event.pos()})", 2, debug_level=self.parent.debug_level_value)
+            debug_print(f"No hotspot hit at {pos} (viewport: {event.pos()})", 2, debug_level=self.parent.debug_level_value if self.parent.settings else 1)
 
     def toggle_hotspots(self):
         self.overlay_enabled = not self.overlay_enabled
         if self.overlay_enabled and not self.pixmap.isNull():
             if not self.overlay_items:
-                debug_print("Adding hotspot overlays", 1, debug_level=self.parent.debug_level_value)
+                debug_print("Adding hotspot overlays", 1, debug_level=self.parent.debug_level_value if self.parent.settings else 1)
                 for button_id, rect in self.base_hotspots.items():
                     item = self.scene.addRect(rect, QPen(QColor(Qt.red), 2))
                     self.overlay_items[button_id] = item
@@ -174,13 +176,13 @@ class ButtonsTab(QWidget):
         elif self.overlay_items:
             for item in self.overlay_items.values():
                 item.hide()
-        debug_print(f"Hotspot overlay {'enabled' if self.overlay_enabled else 'disabled'}", 1, debug_level=self.parent.debug_level_value)
+        debug_print(f"Hotspot overlay {'enabled' if self.overlay_enabled else 'disabled'}", 1, debug_level=self.parent.debug_level_value if self.parent.settings else 1)
 
     def save_preset(self):
         dialog = SavePresetDialog(self)
         if dialog.exec_():
             name = dialog.get_name()
-            if name:
+            if name and self.parent.settings:
                 self.parent.settings.save_button_preset_with_name(name)
                 self.preset_selector.clear()
                 self.preset_selector.addItems(self.parent.settings.button_presets.keys())
@@ -192,7 +194,7 @@ class ButtonsTab(QWidget):
         if name == "Default":
             QMessageBox.warning(self, "Cannot Delete", "The 'Default' preset cannot be deleted.")
             return
-        if name in self.parent.settings.button_presets:
+        if self.parent.settings and name in self.parent.settings.button_presets:
             reply = QMessageBox.question(self, "Confirm Delete", f"Are you sure you want to delete preset '{name}'?",
                                          QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
             if reply == QMessageBox.Yes:
@@ -203,12 +205,13 @@ class ButtonsTab(QWidget):
                 debug_print(f"Preset deleted and selector refreshed: {name}", 1, debug_level=self.parent.debug_level_value)
 
     def load_preset_mappings(self, preset_name):
-        self.parent.settings.load_button_preset(preset_name)
-        debug_print(f"Loaded preset: {preset_name}", 1, debug_level=self.parent.debug_level_value)
+        if self.parent.settings:
+            self.parent.settings.load_button_preset(preset_name)
+            debug_print(f"Loaded preset: {preset_name}", 1, debug_level=self.parent.debug_level_value)
 
     def refresh_available_actions(self):
         self.available_actions = ["None"] + [action.objectName() for action in Krita.instance().actions() if action.objectName()]
-        debug_print(f"Refreshed available actions: {len(self.available_actions)} items", 1, debug_level=self.parent.debug_level_value)
+        debug_print(f"Refreshed available actions: {len(self.available_actions)} items", 1, debug_level=self.parent.debug_level_value if self.parent.settings else 1)
 
     def show_puck_config_dialog(self):
         self.parent.config_dialogs.show_puck_config()
