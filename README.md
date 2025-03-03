@@ -3,7 +3,7 @@
 
 - A feature-rich plugin for integrating SpaceMouse functionality with Krita under Linux.
 
-[**Documentation Wiki**]((https://github.com/Totem-FPV/Krita_Spacemouse/wiki))
+[**Documentation Wiki**](https://github.com/Totem-FPV/Krita_Spacemouse/wiki)
 
 - Leveraging the SpaceMouse's powerful 6 axis joystick and compact array of buttons, Krita_SpaceMouse seeks to fully eliminate the need for a keyboard from the user's desktop, allowing you to focus on what really matters: Your Art.
 
