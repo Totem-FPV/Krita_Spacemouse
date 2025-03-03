@@ -26,6 +26,8 @@ class SpacenavControlExtension(Extension):
         self.modifier_states = {"Shift": False, "Ctrl": False, "Alt": False}
         self.recent_presets = []
         self.view_states = {"V1": None, "V2": None, "V3": None}  # (x, y, zoom, rotation)
+        self.lock_rotation = False  # New lock flags
+        self.lock_zoom = False
         # Set default debug_level_value early
         self.debug_level_value = 1
         # Load polling interval from settings or default to 10ms
@@ -80,3 +82,17 @@ class SpacenavControlExtension(Extension):
             debug_print("SpacenavControlExtension: Stopped.", 1, debug_level=self.docker.debug_level_value if self.docker else self.debug_level_value)
         except Exception as e:
             debug_print(f"Error in stop: {e}", 1, debug_level=self.docker.debug_level_value if self.docker else self.debug_level_value)
+
+    # New lock toggle methods
+    def toggle_lock_rotation(self):
+        self.lock_rotation = not self.lock_rotation
+        debug_print(f"Rotation lock {'enabled' if self.lock_rotation else 'disabled'}", 1, debug_level=self.docker.debug_level_value if self.docker else self.debug_level_value)
+
+    def toggle_lock_zoom(self):
+        self.lock_zoom = not self.lock_zoom
+        debug_print(f"Zoom lock {'enabled' if self.lock_zoom else 'disabled'}", 1, debug_level=self.docker.debug_level_value if self.docker else self.debug_level_value)
+
+    def toggle_lock_both(self):
+        self.lock_rotation = not self.lock_rotation
+        self.lock_zoom = not self.lock_zoom
+        debug_print(f"Rotation and Zoom lock {'enabled' if self.lock_rotation else 'disabled'}", 1, debug_level=self.docker.debug_level_value if self.docker else self.debug_level_value)

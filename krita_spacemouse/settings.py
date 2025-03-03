@@ -16,7 +16,7 @@ class SettingsManager:
                 "10": {"None": "KritaTransform/KisToolMove"}, "11": {"None": "deselect"}, "12": {"None": "toggle_assistant"},
                 "13": {"None": "reset_canvas_rotation"}, "14": {"None": "view_show_canvas_only"}, "15": {"None": "mirror_canvas"},
                 "16": {"None": "rotate_canvas_left"}, "17": {"None": "rotate_canvas_right"}, "18": {"None": "invert_selection"},
-                "19": {"None": "Alt"}, "20": {"None": "Shift"}, "21": {"None": "Ctrl"}, "22": {"None": "None"},
+                "19": {"None": "Alt"}, "20": {"None": "Shift"}, "21": {"None": "Ctrl"}, "22": {"None": "lock_both", "Shift": "lock_rotation", "Ctrl": "lock_zoom"},
                 "23": {"None": "select_all"}, "24": {"None": "edit_cut"}, "25": {"None": "KisToolSelectRectangular"},
                 "26": {"None": "swapForegroundBackground"}, "27": {"None": "recall_view_1", "Shift": "store_view_1"},
                 "28": {"None": "recall_view_2", "Shift": "store_view_2"}, "29": {"None": "recall_view_3", "Shift": "store_view_3"},
@@ -37,11 +37,13 @@ class SettingsManager:
 
         for canvas_axis in ["X (Panning Horizontal)", "Y (Panning Vertical)", "Zoom", "Rotation"]:
             self.axis_settings[canvas_axis] = {
-                "sensitivity": 0.20 if "Panning" in canvas_axis else 0.5 if canvas_axis == "Zoom" else 0.40,
-                "dead_zone": 130 if "Panning" in canvas_axis else 10 if canvas_axis == "Zoom" else 250,
+                "sensitivity": 1.0,
+                "dead_zone": 130 if "Panning" in canvas_axis else 50 if canvas_axis == "Zoom" else 150,
                 "invert": True,
                 "binding": self.default_mappings.get(canvas_axis.split()[0], "RZ")
             }
+        for axis in self.sn_axes:
+            self.axis_settings[axis] = {"dead_zone_offset": 0, "sensitivity": 1.0}
 
         if load:
             try:
@@ -67,12 +69,28 @@ class SettingsManager:
                     self.axis_settings[canvas_axis]["invert"] = settings.get(f"{axis_key}_invert", True)
                     self.axis_settings[canvas_axis]["binding"] = settings.get(f"{axis_key}_binding", self.default_mappings.get(canvas_axis.split()[0], "RZ"))
 
+                for axis in self.sn_axes:
+                    axis_key = axis.lower()
+                    if f"{axis_key}_dead_zone_offset" in settings:
+                        self.axis_settings[axis]["dead_zone_offset"] = settings[f"{axis_key}_dead_zone_offset"]
+                    elif f"{axis_key}_dead_zone" in settings:
+                        global_dead_zone = settings.get("global_dead_zone", 130)
+                        self.axis_settings[axis]["dead_zone_offset"] = settings[f"{axis_key}_dead_zone"] - global_dead_zone
+                    if f"{axis_key}_sensitivity" in settings:
+                        self.axis_settings[axis]["sensitivity"] = settings[f"{axis_key}_sensitivity"]
+
                 if hasattr(self.parent, 'advanced_tab'):
                     self.parent.debug_level_value = settings.get("debug_level", 1)
                     self.parent.advanced_tab.debug_level.setCurrentIndex(self.parent.debug_level_value)
                     polling_interval = settings.get("polling_interval", 10)
                     self.parent.advanced_tab.polling_slider.setValue(polling_interval)
                     self.parent.advanced_tab.polling_label.setText(f"Polling Rate: {polling_interval}ms ({1000/polling_interval:.1f}Hz)")
+                    global_dead_zone = settings.get("global_dead_zone", 130)
+                    self.parent.advanced_tab.dead_zone_slider.setValue(global_dead_zone)
+                    self.parent.advanced_tab.dead_zone_label.setText(f"Global Dead Zone: {global_dead_zone}")
+                    global_sensitivity = settings.get("global_sensitivity", 100)
+                    self.parent.advanced_tab.sensitivity_slider.setValue(global_sensitivity)
+                    self.parent.advanced_tab.sensitivity_label.setText(f"Global Sensitivity: {global_sensitivity}%")
                 else:
                     self.parent.debug_level_value = settings.get("debug_level", 1)
 
@@ -130,6 +148,8 @@ class SettingsManager:
                 self.parent.debug_level_value = 1
                 self.parent.advanced_tab.debug_level.setCurrentIndex(1)
                 self.parent.advanced_tab.polling_slider.setValue(10)
+                self.parent.advanced_tab.dead_zone_slider.setValue(130)
+                self.parent.advanced_tab.sensitivity_slider.setValue(100)
             else:
                 self.parent.debug_level_value = 1
         self.load_button_preset("Default")
@@ -146,9 +166,13 @@ class SettingsManager:
         if hasattr(self.parent, 'advanced_tab'):
             settings["debug_level"] = self.parent.advanced_tab.debug_level.currentIndex()
             settings["polling_interval"] = self.parent.advanced_tab.polling_slider.value()
+            settings["global_dead_zone"] = self.parent.advanced_tab.dead_zone_slider.value()
+            settings["global_sensitivity"] = self.parent.advanced_tab.sensitivity_slider.value()
         else:
             settings["debug_level"] = getattr(self.parent, 'debug_level_value', 1)
             settings["polling_interval"] = 10
+            settings["global_dead_zone"] = 130
+            settings["global_sensitivity"] = 100
 
         for canvas_axis in ["X (Panning Horizontal)", "Y (Panning Vertical)", "Zoom", "Rotation"]:
             axis_key = canvas_axis.split()[0].lower()
@@ -161,7 +185,10 @@ class SettingsManager:
 
         for axis in self.sn_axes:
             if axis in self.axis_settings:
-                settings[f"{axis.lower()}_dead_zone"] = self.axis_settings[axis].get("dead_zone", 130)
+                if "dead_zone_offset" in self.axis_settings[axis]:
+                    settings[f"{axis.lower()}_dead_zone_offset"] = self.axis_settings[axis]["dead_zone_offset"]
+                if "sensitivity" in self.axis_settings[axis]:
+                    settings[f"{axis.lower()}_sensitivity"] = self.axis_settings[axis]["sensitivity"]
         save_settings(settings)
         debug_print("Settings saved", 1, debug_level=getattr(self.parent, 'debug_level_value', 1))
 

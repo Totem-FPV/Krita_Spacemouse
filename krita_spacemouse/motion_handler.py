@@ -10,13 +10,17 @@ def process_motion_event(self, axis_inputs):
     docker = self.docker
     max_input = 500
     dx = dy = zoom_delta = rotation_delta = 0
-    zoom_scale = 0.004
-    rotation_scale = 0.04
+    zoom_scale = 0.002
+    rotation_scale = 0.02
     modifiers = Qt.NoModifier
     if 0 in self.button_states and self.button_states[0]:
         modifiers |= Qt.ShiftModifier
 
-    triggered_actions = set()  # Track actions to avoid duplicates in one poll cycle
+    triggered_actions = set()
+    global_dead_zone = docker.advanced_tab.dead_zone_slider.value() if hasattr(docker, 'advanced_tab') else 130
+    # Rescale sensitivity: 0-100% maps to 0-0.3 (30% from last version = 100% now)
+    global_sensitivity_raw = docker.advanced_tab.sensitivity_slider.value() if hasattr(docker, 'advanced_tab') else 100
+    global_sensitivity = global_sensitivity_raw / 333.33  # 100% = 0.3 effective
 
     for sm_axis in ["x", "y", "z", "rx", "ry", "rz"]:
         action = docker.settings.puck_mappings.get(sm_axis.upper(), "None")
@@ -41,7 +45,7 @@ def process_motion_event(self, axis_inputs):
                 continue
 
             settings = docker.settings.axis_settings[full_axis]
-            sensitivity = settings["sensitivity"]
+            sensitivity = global_sensitivity * settings["sensitivity"]
             invert = -1 if settings["invert"] else 1
             dead_zone = settings["dead_zone"]
             normalized_input = max(0, min(1, (abs(raw_input) - dead_zone) / (max_input - dead_zone))) if abs(raw_input) >= dead_zone else 0
@@ -57,12 +61,13 @@ def process_motion_event(self, axis_inputs):
                     dx = int(scaled_value)
                 elif axis_key == "Y":
                     dy = int(scaled_value)
-                elif axis_key == "Zoom":
+                elif axis_key == "Zoom" and not self.lock_zoom:
                     zoom_delta = scaled_value * zoom_scale
-                elif axis_key == "Rotation":
+                elif axis_key == "Rotation" and not self.lock_rotation:
                     rotation_delta = max(min(scaled_value * rotation_scale, 10.0), -10.0)
+                    rotation_delta = round(rotation_delta, 0)
         elif isinstance(action, dict) and "negative" in action and "positive" in action:
-            dead_zone = docker.settings.axis_settings.get(sm_axis.upper(), {}).get("dead_zone", 130)
+            dead_zone = global_dead_zone + docker.settings.axis_settings.get(sm_axis.upper(), {}).get("dead_zone_offset", 0)
             if abs(raw_input) >= dead_zone:
                 action_name = action["negative"] if raw_input < 0 else action["positive"]
                 if action_name != "None" and action_name not in triggered_actions:

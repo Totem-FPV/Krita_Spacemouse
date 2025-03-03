@@ -91,7 +91,6 @@ class ConfigDialogs:
             "RY": "purple",
             "RZ": "orange"
         }
-        # Refresh actions early
         self.parent.buttons_tab.refresh_available_actions()
 
     def show_button_config(self, button_id):
@@ -116,7 +115,7 @@ class ConfigDialogs:
         default_layout.addWidget(default_btn)
         layout.addLayout(default_layout)
 
-        for modifier in ["Ctrl", "Alt", "Shift"]:
+        for modifier in ["Ctrl", "Alt", "Shift", "Super", "Meta"]:
             mod_layout = QHBoxLayout()
             mod_label = QLabel(f"{modifier}+Action:")
             mod_action = mapped_actions.get(modifier, "None")
@@ -140,8 +139,10 @@ class ConfigDialogs:
         action_menu.addSeparator()
 
         self.parent.buttons_tab.refresh_available_actions()
-        view_actions = ["store_view_1", "recall_view_1", "store_view_2", "recall_view_2", "store_view_3", "recall_view_3"]
-        for view_action in view_actions:
+        view_actions = ["store_view_1", "recall_view_1", "store_view_2", "recall_view_2", "store_view_3", "recall_view_3",
+                        "lock_rotation", "lock_zoom", "lock_both"]
+        modifier_actions = ["Shift", "Ctrl", "Alt", "Super", "Meta"]
+        for view_action in view_actions + modifier_actions:
             if view_action not in self.parent.buttons_tab.available_actions:
                 self.parent.buttons_tab.available_actions.append(view_action)
         debug_print(f"Populating button config with {len(self.parent.buttons_tab.available_actions)} standard actions", 1, debug_level=self.parent.debug_level_value)
@@ -153,7 +154,8 @@ class ConfigDialogs:
             "Scripts": ["ai_", "python_", "ten_"],
             "SVG Tools": ["svg_"],
             "Tools": ["tool_", "kis_tool"],
-            "View": ["store_view_", "recall_view_"],
+            "View": ["store_view_", "recall_view_", "lock_"],
+            "Modifiers": ["Shift", "Ctrl", "Alt", "Super", "Meta"],
             "Other": []
         }
         action_menus = {}
@@ -165,7 +167,7 @@ class ConfigDialogs:
         for action_name in self.parent.buttons_tab.available_actions:
             if action_name == "None":
                 continue
-            qaction = Krita.instance().action(action_name) if not action_name.startswith(("store_view_", "recall_view_")) else None
+            qaction = Krita.instance().action(action_name) if not action_name.startswith(("store_view_", "recall_view_", "lock_", "Shift", "Ctrl", "Alt", "Super", "Meta")) else None
             placed = False
             for cat, prefixes in categories.items():
                 if cat != "Other" and any(action_name.lower().startswith(prefix.lower()) for prefix in prefixes):
@@ -221,7 +223,7 @@ class ConfigDialogs:
                 "pos_btn": None,
                 "neg_label": None,
                 "pos_label": None,
-                "mode_btn": None  # Tracks Canvas Motion or Krita Actions mode
+                "mode_btn": None
             }
 
         for i, axis in enumerate(spnav_axes):
@@ -281,11 +283,18 @@ class ConfigDialogs:
         save_btn = QPushButton("Save")
         save_btn.setToolTip("Save all axis settings and close this dialog")
         def save_settings():
+            global_dead_zone = self.parent.advanced_tab.dead_zone_slider.value() if hasattr(self.parent, 'advanced_tab') else 130
             for axis, controls in self.axis_controls.items():
                 action = self.parent.settings.puck_mappings.get(axis, "None")
-                if isinstance(action, dict):  # Krita actions
+                if isinstance(action, dict):
                     if controls["dead_zone"] is not None:
-                        self.parent.settings.axis_settings[axis]["dead_zone"] = controls["dead_zone"].value()
+                        if axis not in self.parent.settings.axis_settings:
+                            self.parent.settings.axis_settings[axis] = {"dead_zone_offset": 0}
+                        self.parent.settings.axis_settings[axis]["dead_zone_offset"] = controls["dead_zone"].value()
+                        debug_print(f"Saved {axis} Krita action dead zone offset: {controls['dead_zone'].value()}", 2, debug_level=self.parent.debug_level_value)
+                    if controls["sensitivity"] is not None:
+                        self.parent.settings.axis_settings[axis]["sensitivity"] = controls["sensitivity"].value()
+                        debug_print(f"Saved {axis} Krita action sensitivity: {controls['sensitivity'].value()}", 2, debug_level=self.parent.debug_level_value)
                 elif action != "None" and all(controls[key] is not None for key in ["sensitivity", "dead_zone", "invert"]):
                     canvas_axis = action.split()[0]
                     if canvas_axis == "Pan" and "Horizontal" in action:
@@ -294,8 +303,9 @@ class ConfigDialogs:
                         canvas_axis = "Y"
                     full_axis = f"{canvas_axis} (Panning Horizontal)" if canvas_axis == "X" else f"{canvas_axis} (Panning Vertical)" if canvas_axis == "Y" else canvas_axis
                     self.parent.settings.axis_settings[full_axis]["sensitivity"] = controls["sensitivity"].value()
-                    self.parent.settings.axis_settings[full_axis]["dead_zone"] = controls["dead_zone"].value()
+                    self.parent.settings.axis_settings[full_axis]["dead_zone"] = global_dead_zone + controls["dead_zone"].value()
                     self.parent.settings.axis_settings[full_axis]["invert"] = controls["invert"].isChecked()
+                    debug_print(f"Saved {full_axis} motion dead zone: {global_dead_zone + controls['dead_zone'].value()}", 2, debug_level=self.parent.debug_level_value)
             self.parent.settings.save_current_settings()
             self.timer.stop()
             dialog.accept()
@@ -354,20 +364,33 @@ class ConfigDialogs:
 
         self.axis_controls[axis]["action_menu"] = action_menu
         self.axis_controls[axis]["mode_btn"] = mode_btn
+        global_dead_zone = self.parent.advanced_tab.dead_zone_slider.value() if hasattr(self.parent, 'advanced_tab') else 130
+        global_sensitivity = self.parent.advanced_tab.sensitivity_slider.value() / 333.33 if hasattr(self.parent, 'advanced_tab') else 0.3
 
-        if action == "None":  # Default to motion mode with no action selected
+        if action == "None":
             mode_btn.setText("Krita Actions")
             row = 0
+            temp_sensitivity = QDoubleSpinBox()
+            temp_sensitivity.setRange(0.1, 3.0)
+            temp_sensitivity.setSingleStep(0.05)
+            temp_sensitivity.setDecimals(2)
+            temp_sensitivity.setValue(self.parent.settings.axis_settings.get(axis, {}).get("sensitivity", 1.0))
+            temp_sensitivity.setToolTip(f"Adjust sensitivity relative to global ({global_sensitivity:.2f}); final = {global_sensitivity * temp_sensitivity.value():.2f}")
+            temp_sensitivity.valueChanged.connect(lambda v, ax=axis: self._set_axis_setting(ax, "sensitivity", v))
+            settings_layout.addWidget(QLabel("Sensitivity Factor:"), row, 0)
+            settings_layout.addWidget(temp_sensitivity, row, 1)
+            row += 1
+
             temp_dead_zone = QSpinBox()
-            temp_dead_zone.setRange(0, 500)
-            temp_dead_zone.setValue(self.parent.settings.axis_settings.get(axis, {}).get("dead_zone", 130))
-            temp_dead_zone.setToolTip("Minimum input threshold (0-500) to trigger this axis")
-            temp_dead_zone.valueChanged.connect(lambda v, ax=axis: self._set_axis_setting(ax, "dead_zone", v))
-            settings_layout.addWidget(QLabel("Dead Zone:"), row, 0)
+            temp_dead_zone.setRange(-130, 370)
+            temp_dead_zone.setValue(self.parent.settings.axis_settings.get(axis, {}).get("dead_zone_offset", 0))
+            temp_dead_zone.setToolTip(f"Adjust dead zone relative to global ({global_dead_zone}); final = {global_dead_zone + temp_dead_zone.value()}")
+            temp_dead_zone.valueChanged.connect(lambda v, ax=axis: self._set_axis_setting(ax, "dead_zone_offset", v))
+            settings_layout.addWidget(QLabel("Dead Zone Offset:"), row, 0)
             settings_layout.addWidget(temp_dead_zone, row, 1)
 
             if axis in self.axis_controls:
-                self.axis_controls[axis]["sensitivity"] = None
+                self.axis_controls[axis]["sensitivity"] = temp_sensitivity
                 self.axis_controls[axis]["dead_zone"] = temp_dead_zone
                 self.axis_controls[axis]["invert"] = None
                 self.axis_controls[axis]["layout"] = settings_layout
@@ -388,22 +411,23 @@ class ConfigDialogs:
 
             row = 0
             temp_sensitivity = QDoubleSpinBox()
-            temp_sensitivity.setRange(0.001, 10.0 if full_axis != "Zoom" else 1.0)
-            temp_sensitivity.setSingleStep(0.1 if full_axis != "Zoom" else 0.01)
-            temp_sensitivity.setDecimals(2 if full_axis != "Zoom" else 4)
+            temp_sensitivity.setRange(0.1, 3.0)
+            temp_sensitivity.setSingleStep(0.05)
+            temp_sensitivity.setDecimals(2)
             temp_sensitivity.setValue(self.parent.settings.axis_settings[full_axis]["sensitivity"])
-            temp_sensitivity.setToolTip("Adjusts how responsive this axis is to input (higher = faster)")
+            temp_sensitivity.setToolTip(f"Adjust sensitivity relative to global ({global_sensitivity:.2f}); final = {global_sensitivity * temp_sensitivity.value():.2f}")
             temp_sensitivity.valueChanged.connect(lambda v, fa=full_axis: self._set_axis_setting(fa, "sensitivity", v))
-            settings_layout.addWidget(QLabel(f"{canvas_axis} Sensitivity:"), row, 0)
+            settings_layout.addWidget(QLabel(f"{canvas_axis} Sensitivity Factor:"), row, 0)
             settings_layout.addWidget(temp_sensitivity, row, 1)
             row += 1
 
             temp_dead_zone = QSpinBox()
-            temp_dead_zone.setRange(0, 500)
-            temp_dead_zone.setValue(self.parent.settings.axis_settings[full_axis]["dead_zone"])
-            temp_dead_zone.setToolTip("Minimum input threshold (0-500) to trigger this motion")
+            temp_dead_zone.setRange(-130, 370)
+            offset = self.parent.settings.axis_settings[full_axis]["dead_zone"] - global_dead_zone
+            temp_dead_zone.setValue(offset)
+            temp_dead_zone.setToolTip(f"Adjust dead zone relative to global ({global_dead_zone}); final = {global_dead_zone + offset}")
             temp_dead_zone.valueChanged.connect(lambda v, fa=full_axis: self._set_axis_setting(fa, "dead_zone", v))
-            settings_layout.addWidget(QLabel("Dead Zone:"), row, 0)
+            settings_layout.addWidget(QLabel("Dead Zone Offset:"), row, 0)
             settings_layout.addWidget(temp_dead_zone, row, 1)
             row += 1
 
@@ -446,7 +470,8 @@ class ConfigDialogs:
                     "Scripts": ["ai_", "python_", "ten_"],
                     "SVG Tools": ["svg_"],
                     "Tools": ["tool_", "kis_tool"],
-                    "View": ["store_view_", "recall_view_"],
+                    "View": ["store_view_", "recall_view_", "lock_"],
+                    "Modifiers": ["Shift", "Ctrl", "Alt", "Super", "Meta"],
                     "Other": []
                 }
                 action_menus = {}
@@ -454,12 +479,17 @@ class ConfigDialogs:
                     submenu = menu.addMenu(cat)
                     submenu.setStyleSheet("QMenu { menu-scrollable: 1; }")
                     action_menus[cat] = submenu
-                # Ensure actions are populated
                 self.parent.buttons_tab.refresh_available_actions()
+                view_actions = ["store_view_1", "recall_view_1", "store_view_2", "recall_view_2", "store_view_3", "recall_view_3",
+                                "lock_rotation", "lock_zoom", "lock_both"]
+                modifier_actions = ["Shift", "Ctrl", "Alt", "Super", "Meta"]
+                for action in view_actions + modifier_actions:
+                    if action not in self.parent.buttons_tab.available_actions:
+                        self.parent.buttons_tab.available_actions.append(action)
                 for action_name in self.parent.buttons_tab.available_actions:
                     if action_name == "None":
                         continue
-                    qaction = Krita.instance().action(action_name) if not action_name.startswith(("store_view_", "recall_view_")) else None
+                    qaction = Krita.instance().action(action_name) if not action_name.startswith(("store_view_", "recall_view_", "lock_", "Shift", "Ctrl", "Alt", "Super", "Meta")) else None
                     placed = False
                     for cat, prefixes in categories.items():
                         if cat != "Other" and any(action_name.lower().startswith(prefix.lower()) for prefix in prefixes):
@@ -483,15 +513,27 @@ class ConfigDialogs:
             row += 1
 
             temp_dead_zone = QSpinBox()
-            temp_dead_zone.setRange(0, 500)
-            temp_dead_zone.setValue(self.parent.settings.axis_settings.get(axis, {}).get("dead_zone", 130))
-            temp_dead_zone.setToolTip("Minimum input threshold (0-500) to trigger these actions")
-            temp_dead_zone.valueChanged.connect(lambda v, ax=axis: self._set_axis_setting(ax, "dead_zone", v))
-            settings_layout.addWidget(QLabel("Dead Zone:"), row, 0)
+            temp_dead_zone.setRange(-130, 370)
+            offset = self.parent.settings.axis_settings.get(axis, {}).get("dead_zone_offset", 0)
+            temp_dead_zone.setValue(offset)
+            temp_dead_zone.setToolTip(f"Adjust dead zone relative to global ({global_dead_zone}); final = {global_dead_zone + offset}")
+            temp_dead_zone.valueChanged.connect(lambda v, ax=axis: self._set_axis_setting(ax, "dead_zone_offset", v))
+            settings_layout.addWidget(QLabel("Dead Zone Offset:"), row, 0)
             settings_layout.addWidget(temp_dead_zone, row, 1)
+            row += 1
+
+            temp_sensitivity = QDoubleSpinBox()
+            temp_sensitivity.setRange(0.1, 3.0)
+            temp_sensitivity.setSingleStep(0.05)
+            temp_sensitivity.setDecimals(2)
+            temp_sensitivity.setValue(self.parent.settings.axis_settings.get(axis, {}).get("sensitivity", 1.0))
+            temp_sensitivity.setToolTip(f"Adjust sensitivity relative to global ({global_sensitivity:.2f}); final = {global_sensitivity * temp_sensitivity.value():.2f}")
+            temp_sensitivity.valueChanged.connect(lambda v, ax=axis: self._set_axis_setting(ax, "sensitivity", v))
+            settings_layout.addWidget(QLabel("Sensitivity Factor:"), row, 0)
+            settings_layout.addWidget(temp_sensitivity, row, 1)
 
             if axis in self.axis_controls:
-                self.axis_controls[axis]["sensitivity"] = None
+                self.axis_controls[axis]["sensitivity"] = temp_sensitivity
                 self.axis_controls[axis]["dead_zone"] = temp_dead_zone
                 self.axis_controls[axis]["invert"] = None
                 self.axis_controls[axis]["layout"] = settings_layout
@@ -509,10 +551,13 @@ class ConfigDialogs:
         label.setText(f"{direction.capitalize()}: {action}")
 
     def _set_axis_setting(self, axis_or_full, key, value):
-        if key == "dead_zone" and axis_or_full in ["X", "Y", "Z", "RX", "RY", "RZ"]:  # Krita action mode
+        if key == "dead_zone_offset" and axis_or_full in ["X", "Y", "Z", "RX", "RY", "RZ"]:
             if axis_or_full not in self.parent.settings.axis_settings:
                 self.parent.settings.axis_settings[axis_or_full] = {}
             self.parent.settings.axis_settings[axis_or_full][key] = value
-        else:  # Canvas motion mode
+        elif key == "dead_zone":  # Motion mode stores absolute value
+            global_dead_zone = self.parent.advanced_tab.dead_zone_slider.value() if hasattr(self.parent, 'advanced_tab') else 130
+            self.parent.settings.axis_settings[axis_or_full][key] = global_dead_zone + value
+        else:  # Sensitivity, invert
             self.parent.settings.axis_settings[axis_or_full][key] = value
         self.parent.settings.save_current_settings()

@@ -1,3 +1,4 @@
+# buttons_tab.py
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QComboBox, QLabel, QPushButton, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QMessageBox
 from PyQt5.QtGui import QPixmap, QMouseEvent, QPen, QColor, QPainter
 from PyQt5.QtCore import Qt, QRectF, QEvent
@@ -73,26 +74,33 @@ class ButtonsTab(QWidget):
         self.layout.addWidget(self.view)
 
         self.preset_layout = QHBoxLayout()
+        preset_label = QLabel("Preset:")
+        preset_label.setToolTip("Load or switch between saved button mapping presets")
         self.preset_selector = QComboBox()
+        self.preset_selector.setToolTip("Choose a preset to apply its button mappings")
         preset_keys = self.parent.settings.button_presets.keys() if self.parent.settings else ["Default"]
         self.preset_selector.addItems(preset_keys)
         self.preset_selector.setCurrentText("Default")
         self.preset_selector.currentTextChanged.connect(self.load_preset_mappings)
         self.save_preset_btn = QPushButton("Save Preset")
+        self.save_preset_btn.setToolTip("Save the current button mappings as a new preset")
         self.save_preset_btn.clicked.connect(self.save_preset)
         self.delete_preset_btn = QPushButton("Delete Preset")
+        self.delete_preset_btn.setToolTip("Remove the selected preset (except 'Default')")
         self.delete_preset_btn.clicked.connect(self.delete_preset)
-        self.preset_layout.addWidget(QLabel("Preset:"))
+        self.preset_layout.addWidget(preset_label)
         self.preset_layout.addWidget(self.preset_selector)
         self.preset_layout.addWidget(self.save_preset_btn)
         self.preset_layout.addWidget(self.delete_preset_btn)
         self.layout.addLayout(self.preset_layout)
 
         self.puck_config_btn = QPushButton("Configure Puck")
+        self.puck_config_btn.setToolTip("Open settings to map puck axes to motions or actions")
         self.puck_config_btn.clicked.connect(self.show_puck_config_dialog)
         self.layout.addWidget(self.puck_config_btn)
 
         self.hotspot_toggle = QPushButton("Toggle Hotspot Overlay")
+        self.hotspot_toggle.setToolTip("Show/hide red outlines around clickable button areas")
         self.hotspot_toggle.clicked.connect(self.toggle_hotspots)
         self.layout.addWidget(self.hotspot_toggle)
 
@@ -137,7 +145,7 @@ class ButtonsTab(QWidget):
                             if action != "None":
                                 tooltip += f"{mod}: {action}\n"
                     else:
-                        tooltip = "Puck Configuration"
+                        tooltip = "Puck Configuration\nClick to map puck axes"
                     self.view.setToolTip(tooltip.strip())
                     break
             else:
