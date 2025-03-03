@@ -1,3 +1,4 @@
+# event_handler.py
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QMdiArea, QScrollBar, QAbstractScrollArea
 from krita import Krita
@@ -25,7 +26,6 @@ def poll_spacenav(self):
                     self.docker = d
                     self.docker.set_extension(self)
                     debug_print("Docker found by objectName and extension set", 1, debug_level=1)
-                    self.update_lcd_buttons()
                     break
             else:
                 debug_print("Docker not found, using defaults", 1, debug_level=1)
@@ -74,4 +74,3 @@ def poll_spacenav(self):
     except Exception as e:
         debug_print(f"Unexpected error in poll: {e}", 1, debug_level=self.docker.debug_level_value if self.docker else 1)
         self.timer.stop()
-

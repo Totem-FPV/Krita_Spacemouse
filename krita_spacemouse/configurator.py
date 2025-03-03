@@ -1,3 +1,4 @@
+# configurator.py
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QComboBox, QLabel, QPushButton, QGridLayout, QInputDialog, QDoubleSpinBox, QSpinBox, QCheckBox, QHBoxLayout, QWidget, QMenu, QLineEdit, QScrollArea
 from PyQt5.QtCore import pyqtSlot, Qt, QPoint, QSize, QTimer
 from PyQt5.QtGui import QIcon, QPixmap, QColor, QPainter
@@ -75,6 +76,7 @@ class BrushPresetPopup(QWidget):
 
 class ConfigDialogs:
     def __init__(self, parent):
+        super().__init__()
         self.parent = parent
         self.axis_widgets = {}
         self.axis_controls = {}
@@ -89,6 +91,8 @@ class ConfigDialogs:
             "RY": "purple",
             "RZ": "orange"
         }
+        # Refresh actions early
+        self.parent.buttons_tab.refresh_available_actions()
 
     def show_button_config(self, button_id):
         self.button_id = button_id
@@ -149,7 +153,7 @@ class ConfigDialogs:
             "Scripts": ["ai_", "python_", "ten_"],
             "SVG Tools": ["svg_"],
             "Tools": ["tool_", "kis_tool"],
-            "View": ["store_view_", "recall_view_"],  # New category for view actions
+            "View": ["store_view_", "recall_view_"],
             "Other": []
         }
         action_menus = {}
@@ -197,7 +201,6 @@ class ConfigDialogs:
         spnav_axes = ["X", "Y", "Z", "RX", "RY", "RZ"]
         base_actions = ["None"]
         canvas_actions = ["Pan X (Panning Horizontal)", "Pan Y (Panning Vertical)", "Zoom", "Rotation"]
-        modifiers = ["None", "Shift", "Ctrl", "Alt"]
 
         columns_layout = QHBoxLayout()
         left_column = QVBoxLayout()
@@ -213,7 +216,12 @@ class ConfigDialogs:
                 "sensitivity": None,
                 "dead_zone": None,
                 "invert": None,
-                "layout": None
+                "layout": None,
+                "neg_btn": None,
+                "pos_btn": None,
+                "neg_label": None,
+                "pos_label": None,
+                "mode_btn": None  # Tracks Canvas Motion or Krita Actions mode
             }
 
         for i, axis in enumerate(spnav_axes):
@@ -229,37 +237,36 @@ class ConfigDialogs:
             self.axis_labels[axis] = label
             self.axis_indicators[axis] = indicator_widget
 
-            action_btn = QPushButton("Select Action")
+            action_btn = QPushButton("Canvas Motion")
+            action_btn.setToolTip("Select a canvas motion (e.g., Pan, Zoom) or switch to Krita Actions")
             action_menu = QMenu(action_btn)
 
             for action in base_actions:
                 menu_action = action_menu.addAction(action)
-                menu_action.triggered.connect(lambda checked, a=action, ax=axis: self.parent.settings.update_puck_mapping(ax, a, "action"))
+                menu_action.triggered.connect(lambda checked, a=action, ax=axis: self.parent.settings.update_puck_mapping(ax, a))
 
             canvas_menu = action_menu.addMenu("Canvas Motion")
             for action in canvas_actions:
                 menu_action = canvas_menu.addAction(action)
-                menu_action.triggered.connect(lambda checked, a=action, ax=axis: self.parent.settings.update_puck_mapping(ax, a, "action"))
+                menu_action.triggered.connect(lambda checked, a=action, ax=axis: self.parent.settings.update_puck_mapping(ax, a))
 
             action_btn.setMenu(action_menu)
-            modifier_combo = QComboBox()
-            modifier_combo.addItems(modifiers)
-            modifier_combo.setCurrentText(self.parent.settings.puck_modifiers.get(axis, "None"))
-            modifier_combo.currentTextChanged.connect(lambda text, a=axis: self.parent.settings.update_puck_mapping(a, text, "modifier"))
+            mode_btn = QPushButton("Krita Actions")
+            mode_btn.setToolTip("Switch to mapping Krita actions (e.g., Undo, Redo) to this axis")
+            mode_btn.clicked.connect(lambda checked, ax=axis, btn=mode_btn: self.toggle_axis_mode(ax, btn))
 
             settings_container = QWidget()
             settings_layout = QGridLayout()
             settings_container.setLayout(settings_layout)
             self.axis_widgets[axis] = settings_container
 
-            self._update_advanced_settings(axis, self.parent.settings.puck_mappings.get(axis, "None"), settings_layout)
-            action_menu.triggered.connect(lambda: self._update_advanced_settings(axis, self.parent.settings.puck_mappings.get(axis, "None"), settings_layout))
+            self._update_advanced_settings(axis, self.parent.settings.puck_mappings.get(axis, "None"), settings_layout, action_menu, mode_btn)
+            action_menu.triggered.connect(lambda: self._update_advanced_settings(axis, self.parent.settings.puck_mappings.get(axis, "None"), settings_layout, action_menu, mode_btn))
 
             axis_layout.addWidget(indicator_widget)
             axis_layout.addWidget(QLabel("Map to:"))
             axis_layout.addWidget(action_btn)
-            axis_layout.addWidget(QLabel("With:"))
-            axis_layout.addWidget(modifier_combo)
+            axis_layout.addWidget(mode_btn)
             axis_layout.addWidget(settings_container)
 
             if i < 3:
@@ -272,10 +279,14 @@ class ConfigDialogs:
         main_layout.addLayout(columns_layout)
 
         save_btn = QPushButton("Save")
+        save_btn.setToolTip("Save all axis settings and close this dialog")
         def save_settings():
             for axis, controls in self.axis_controls.items():
                 action = self.parent.settings.puck_mappings.get(axis, "None")
-                if action != "None" and all(controls[key] is not None for key in ["sensitivity", "dead_zone", "invert"]):
+                if isinstance(action, dict):  # Krita actions
+                    if controls["dead_zone"] is not None:
+                        self.parent.settings.axis_settings[axis]["dead_zone"] = controls["dead_zone"].value()
+                elif action != "None" and all(controls[key] is not None for key in ["sensitivity", "dead_zone", "invert"]):
                     canvas_axis = action.split()[0]
                     if canvas_axis == "Pan" and "Horizontal" in action:
                         canvas_axis = "X"
@@ -296,6 +307,17 @@ class ConfigDialogs:
         dialog.setMinimumWidth(600)
         dialog.finished.connect(self.timer.stop)
         dialog.exec_()
+
+    def toggle_axis_mode(self, axis, mode_btn):
+        current_action = self.parent.settings.puck_mappings.get(axis, "None")
+        is_action_mode = isinstance(current_action, dict)
+        if is_action_mode:
+            self.parent.settings.update_puck_mapping(axis, "None")
+            mode_btn.setText("Krita Actions")
+        else:
+            self.parent.settings.update_puck_mapping(axis, {"negative": "None", "positive": "None"})
+            mode_btn.setText("Canvas Motion")
+        self._update_advanced_settings(axis, self.parent.settings.puck_mappings[axis], self.axis_widgets[axis].layout(), self.axis_controls[axis]["action_menu"], mode_btn)
 
     def update_axis_colors(self):
         if not hasattr(self.parent, 'extension') or not self.parent.extension or not self.parent.extension.last_motion_data:
@@ -323,53 +345,174 @@ class ConfigDialogs:
                 indicator.setStyleSheet(f"background: {self.axis_colors[axis]}; opacity: 0.3;")
 
     @pyqtSlot(str)
-    def _update_advanced_settings(self, axis, action, settings_layout):
+    def _update_advanced_settings(self, axis, action, settings_layout, action_menu, mode_btn):
         for i in reversed(range(settings_layout.count())):
             widget = settings_layout.itemAt(i).widget()
             if widget:
                 widget.deleteLater()
         settings_layout.update()
 
-        if action == "None":
+        self.axis_controls[axis]["action_menu"] = action_menu
+        self.axis_controls[axis]["mode_btn"] = mode_btn
+
+        if action == "None":  # Default to motion mode with no action selected
+            mode_btn.setText("Krita Actions")
+            row = 0
+            temp_dead_zone = QSpinBox()
+            temp_dead_zone.setRange(0, 500)
+            temp_dead_zone.setValue(self.parent.settings.axis_settings.get(axis, {}).get("dead_zone", 130))
+            temp_dead_zone.setToolTip("Minimum input threshold (0-500) to trigger this axis")
+            temp_dead_zone.valueChanged.connect(lambda v, ax=axis: self._set_axis_setting(ax, "dead_zone", v))
+            settings_layout.addWidget(QLabel("Dead Zone:"), row, 0)
+            settings_layout.addWidget(temp_dead_zone, row, 1)
+
+            if axis in self.axis_controls:
+                self.axis_controls[axis]["sensitivity"] = None
+                self.axis_controls[axis]["dead_zone"] = temp_dead_zone
+                self.axis_controls[axis]["invert"] = None
+                self.axis_controls[axis]["layout"] = settings_layout
+                self.axis_controls[axis]["neg_btn"] = None
+                self.axis_controls[axis]["pos_btn"] = None
+                self.axis_controls[axis]["neg_label"] = None
+                self.axis_controls[axis]["pos_label"] = None
             return
 
-        canvas_axis = action.split()[0]
-        if canvas_axis == "Pan" and "Horizontal" in action:
-            canvas_axis = "X"
-        elif canvas_axis == "Pan" and "Vertical" in action:
-            canvas_axis = "Y"
-        full_axis = f"{canvas_axis} (Panning Horizontal)" if canvas_axis == "X" else f"{canvas_axis} (Panning Vertical)" if canvas_axis == "Y" else canvas_axis
+        if isinstance(action, str) and action in ["Pan X (Panning Horizontal)", "Pan Y (Panning Vertical)", "Zoom", "Rotation"]:
+            mode_btn.setText("Krita Actions")
+            canvas_axis = action.split()[0]
+            if canvas_axis == "Pan" and "Horizontal" in action:
+                canvas_axis = "X"
+            elif canvas_axis == "Pan" and "Vertical" in action:
+                canvas_axis = "Y"
+            full_axis = f"{canvas_axis} (Panning Horizontal)" if canvas_axis == "X" else f"{canvas_axis} (Panning Vertical)" if canvas_axis == "Y" else canvas_axis
 
-        row = 0
-        temp_sensitivity = QDoubleSpinBox()
-        temp_sensitivity.setRange(0.001, 10.0 if full_axis != "Zoom" else 1.0)
-        temp_sensitivity.setSingleStep(0.1 if full_axis != "Zoom" else 0.01)
-        temp_sensitivity.setDecimals(2 if full_axis != "Zoom" else 4)
-        temp_sensitivity.setValue(self.parent.settings.axis_settings[full_axis]["sensitivity"])
-        temp_sensitivity.valueChanged.connect(lambda v, fa=full_axis: self._set_axis_setting(fa, "sensitivity", v))
-        settings_layout.addWidget(QLabel(f"{canvas_axis} Sensitivity:"), row, 0)
-        settings_layout.addWidget(temp_sensitivity, row, 1)
-        row += 1
+            row = 0
+            temp_sensitivity = QDoubleSpinBox()
+            temp_sensitivity.setRange(0.001, 10.0 if full_axis != "Zoom" else 1.0)
+            temp_sensitivity.setSingleStep(0.1 if full_axis != "Zoom" else 0.01)
+            temp_sensitivity.setDecimals(2 if full_axis != "Zoom" else 4)
+            temp_sensitivity.setValue(self.parent.settings.axis_settings[full_axis]["sensitivity"])
+            temp_sensitivity.setToolTip("Adjusts how responsive this axis is to input (higher = faster)")
+            temp_sensitivity.valueChanged.connect(lambda v, fa=full_axis: self._set_axis_setting(fa, "sensitivity", v))
+            settings_layout.addWidget(QLabel(f"{canvas_axis} Sensitivity:"), row, 0)
+            settings_layout.addWidget(temp_sensitivity, row, 1)
+            row += 1
 
-        temp_dead_zone = QSpinBox()
-        temp_dead_zone.setRange(0, 500)
-        temp_dead_zone.setValue(self.parent.settings.axis_settings[full_axis]["dead_zone"])
-        temp_dead_zone.valueChanged.connect(lambda v, fa=full_axis: self._set_axis_setting(fa, "dead_zone", v))
-        settings_layout.addWidget(QLabel("Dead Zone:"), row, 0)
-        settings_layout.addWidget(temp_dead_zone, row, 1)
-        row += 1
+            temp_dead_zone = QSpinBox()
+            temp_dead_zone.setRange(0, 500)
+            temp_dead_zone.setValue(self.parent.settings.axis_settings[full_axis]["dead_zone"])
+            temp_dead_zone.setToolTip("Minimum input threshold (0-500) to trigger this motion")
+            temp_dead_zone.valueChanged.connect(lambda v, fa=full_axis: self._set_axis_setting(fa, "dead_zone", v))
+            settings_layout.addWidget(QLabel("Dead Zone:"), row, 0)
+            settings_layout.addWidget(temp_dead_zone, row, 1)
+            row += 1
 
-        temp_invert = QCheckBox("Invert")
-        temp_invert.setChecked(self.parent.settings.axis_settings[full_axis]["invert"])
-        temp_invert.stateChanged.connect(lambda state, fa=full_axis: self._set_axis_setting(fa, "invert", state == Qt.Checked))
-        settings_layout.addWidget(temp_invert, row, 0)
+            temp_invert = QCheckBox("Invert")
+            temp_invert.setChecked(self.parent.settings.axis_settings[full_axis]["invert"])
+            temp_invert.setToolTip("Reverses the direction of this motion")
+            temp_invert.stateChanged.connect(lambda state, fa=full_axis: self._set_axis_setting(fa, "invert", state == Qt.Checked))
+            settings_layout.addWidget(temp_invert, row, 0)
 
-        if axis in self.axis_controls:
-            self.axis_controls[axis]["sensitivity"] = temp_sensitivity
-            self.axis_controls[axis]["dead_zone"] = temp_dead_zone
-            self.axis_controls[axis]["invert"] = temp_invert
-            self.axis_controls[axis]["layout"] = settings_layout
+            if axis in self.axis_controls:
+                self.axis_controls[axis]["sensitivity"] = temp_sensitivity
+                self.axis_controls[axis]["dead_zone"] = temp_dead_zone
+                self.axis_controls[axis]["invert"] = temp_invert
+                self.axis_controls[axis]["layout"] = settings_layout
+                self.axis_controls[axis]["neg_btn"] = None
+                self.axis_controls[axis]["pos_btn"] = None
+                self.axis_controls[axis]["neg_label"] = None
+                self.axis_controls[axis]["pos_label"] = None
+        else:  # Krita action
+            mode_btn.setText("Canvas Motion")
+            row = 0
+            mapping = action if isinstance(action, dict) else {"negative": "None", "positive": "None"}
+            neg_label = QLabel(f"Negative: {mapping['negative']}")
+            pos_label = QLabel(f"Positive: {mapping['positive']}")
+            neg_btn = QPushButton("Negative Action")
+            pos_btn = QPushButton("Positive Action")
+            neg_btn.setToolTip("Action triggered when pushing this axis in the negative direction")
+            pos_btn.setToolTip("Action triggered when pushing this axis in the positive direction")
 
-    def _set_axis_setting(self, full_axis, key, value):
-        self.parent.settings.axis_settings[full_axis][key] = value
+            def create_action_menu(direction, label):
+                menu = QMenu(self.parent)
+                menu.setStyleSheet("QMenu { menu-scrollable: 1; }")
+                none_action = menu.addAction("None")
+                none_action.triggered.connect(lambda checked: self.update_puck_action(axis, direction, "None", label))
+                menu.addSeparator()
+                categories = {
+                    "Krita": ["krita_", "animation", "blending", "filter", "general", "layer", "painting", "setting", "wg_"],
+                    "Menu": ["brushes", "edit_", "file_", "filter_", "help_", "image_", "select_", "setting_", "view_", "window_"],
+                    "Recorder": ["recorder_"],
+                    "Scripts": ["ai_", "python_", "ten_"],
+                    "SVG Tools": ["svg_"],
+                    "Tools": ["tool_", "kis_tool"],
+                    "View": ["store_view_", "recall_view_"],
+                    "Other": []
+                }
+                action_menus = {}
+                for cat in categories:
+                    submenu = menu.addMenu(cat)
+                    submenu.setStyleSheet("QMenu { menu-scrollable: 1; }")
+                    action_menus[cat] = submenu
+                # Ensure actions are populated
+                self.parent.buttons_tab.refresh_available_actions()
+                for action_name in self.parent.buttons_tab.available_actions:
+                    if action_name == "None":
+                        continue
+                    qaction = Krita.instance().action(action_name) if not action_name.startswith(("store_view_", "recall_view_")) else None
+                    placed = False
+                    for cat, prefixes in categories.items():
+                        if cat != "Other" and any(action_name.lower().startswith(prefix.lower()) for prefix in prefixes):
+                            menu_action = action_menus[cat].addAction(qaction.icon() if qaction else QIcon(), action_name)
+                            menu_action.triggered.connect(lambda checked, a=action_name: self.update_puck_action(axis, direction, a, label))
+                            placed = True
+                            break
+                    if not placed:
+                        menu_action = action_menus["Other"].addAction(qaction.icon() if qaction else QIcon(), action_name)
+                        menu_action.triggered.connect(lambda checked, a=action_name: self.update_puck_action(axis, direction, a, label))
+                return menu
+
+            neg_btn.setMenu(create_action_menu("negative", neg_label))
+            pos_btn.setMenu(create_action_menu("positive", pos_label))
+
+            settings_layout.addWidget(neg_label, row, 0)
+            settings_layout.addWidget(neg_btn, row, 1)
+            row += 1
+            settings_layout.addWidget(pos_label, row, 0)
+            settings_layout.addWidget(pos_btn, row, 1)
+            row += 1
+
+            temp_dead_zone = QSpinBox()
+            temp_dead_zone.setRange(0, 500)
+            temp_dead_zone.setValue(self.parent.settings.axis_settings.get(axis, {}).get("dead_zone", 130))
+            temp_dead_zone.setToolTip("Minimum input threshold (0-500) to trigger these actions")
+            temp_dead_zone.valueChanged.connect(lambda v, ax=axis: self._set_axis_setting(ax, "dead_zone", v))
+            settings_layout.addWidget(QLabel("Dead Zone:"), row, 0)
+            settings_layout.addWidget(temp_dead_zone, row, 1)
+
+            if axis in self.axis_controls:
+                self.axis_controls[axis]["sensitivity"] = None
+                self.axis_controls[axis]["dead_zone"] = temp_dead_zone
+                self.axis_controls[axis]["invert"] = None
+                self.axis_controls[axis]["layout"] = settings_layout
+                self.axis_controls[axis]["neg_btn"] = neg_btn
+                self.axis_controls[axis]["pos_btn"] = pos_btn
+                self.axis_controls[axis]["neg_label"] = neg_label
+                self.axis_controls[axis]["pos_label"] = pos_label
+
+    def update_puck_action(self, axis, direction, action, label):
+        mapping = self.parent.settings.puck_mappings.get(axis, {"negative": "None", "positive": "None"})
+        if not isinstance(mapping, dict):
+            mapping = {"negative": "None", "positive": "None"}
+        mapping[direction] = action
+        self.parent.settings.update_puck_mapping(axis, mapping)
+        label.setText(f"{direction.capitalize()}: {action}")
+
+    def _set_axis_setting(self, axis_or_full, key, value):
+        if key == "dead_zone" and axis_or_full in ["X", "Y", "Z", "RX", "RY", "RZ"]:  # Krita action mode
+            if axis_or_full not in self.parent.settings.axis_settings:
+                self.parent.settings.axis_settings[axis_or_full] = {}
+            self.parent.settings.axis_settings[axis_or_full][key] = value
+        else:  # Canvas motion mode
+            self.parent.settings.axis_settings[axis_or_full][key] = value
         self.parent.settings.save_current_settings()

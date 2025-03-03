@@ -1,4 +1,6 @@
-from PyQt5.QtWidgets import QDockWidget, QWidget, QVBoxLayout, QTabWidget
+# docker.py
+from PyQt5.QtWidgets import QDockWidget, QWidget, QVBoxLayout, QTabWidget, QApplication
+from PyQt5.QtCore import Qt  # Added this import
 from krita import Krita
 from .tabs.curves_tab import CurvesTab
 from .tabs.buttons_tab import ButtonsTab
@@ -19,6 +21,11 @@ class SpacenavDocker(QDockWidget):
         self.setWidget(self.widget)
         self.layout = QVBoxLayout()
         self.widget.setLayout(self.layout)
+
+        # Enable tooltips application-wide
+        QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
+        QApplication.instance().setAttribute(Qt.AA_UseHighDpiPixmaps)
+        self.setAttribute(Qt.WA_Hover, True)  # Ensure hover events for tooltips
 
         self.debug_level_value = 1  # Set early default
         print("[PRE-INIT 2] debug_level_value set")

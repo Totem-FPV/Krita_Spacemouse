@@ -1,3 +1,4 @@
+# settings.py
 from PyQt5.QtWidgets import QDoubleSpinBox, QSpinBox, QCheckBox, QComboBox, QInputDialog
 from PyQt5.QtCore import Qt, QPointF
 from .utils import debug_print, load_settings, save_settings
@@ -30,7 +31,6 @@ class SettingsManager:
             "RY": "Rotation",
             "RZ": "Pan X (Panning Horizontal)"
         }
-        self.puck_modifiers = {axis: "None" for axis in self.puck_mappings}
         self.axis_settings = {}
         self.sn_axes = ["X", "Y", "Z", "RX", "RY", "RZ"]
         self.default_mappings = {"X": "RZ", "Y": "RX", "Zoom": "Y", "Rotation": "RY"}
@@ -67,12 +67,14 @@ class SettingsManager:
                     self.axis_settings[canvas_axis]["invert"] = settings.get(f"{axis_key}_invert", True)
                     self.axis_settings[canvas_axis]["binding"] = settings.get(f"{axis_key}_binding", self.default_mappings.get(canvas_axis.split()[0], "RZ"))
 
-                self.parent.debug_level_value = settings.get("debug_level", 1)
                 if hasattr(self.parent, 'advanced_tab'):
+                    self.parent.debug_level_value = settings.get("debug_level", 1)
                     self.parent.advanced_tab.debug_level.setCurrentIndex(self.parent.debug_level_value)
                     polling_interval = settings.get("polling_interval", 10)
                     self.parent.advanced_tab.polling_slider.setValue(polling_interval)
                     self.parent.advanced_tab.polling_label.setText(f"Polling Rate: {polling_interval}ms ({1000/polling_interval:.1f}Hz)")
+                else:
+                    self.parent.debug_level_value = settings.get("debug_level", 1)
 
                 loaded_mappings = settings.get("button_mappings", self.button_presets["Default"].copy())
                 self.button_mappings = {}
@@ -93,8 +95,15 @@ class SettingsManager:
                         self.button_mappings[btn_id] = {"None": "None"}
 
                 self.button_presets = settings.get("button_presets", self.button_presets)
-                self.puck_mappings = settings.get("puck_mappings", self.puck_mappings)
-                self.puck_modifiers = settings.get("puck_modifiers", self.puck_modifiers)
+                loaded_puck_mappings = settings.get("puck_mappings", self.puck_mappings)
+                self.puck_mappings = {}
+                for axis, mapping in loaded_puck_mappings.items():
+                    if isinstance(mapping, str):
+                        self.puck_mappings[axis] = mapping
+                    elif isinstance(mapping, dict) and "negative" in mapping and "positive" in mapping:
+                        self.puck_mappings[axis] = mapping
+                    else:
+                        self.puck_mappings[axis] = "None"
 
                 if hasattr(self.parent, 'curves_tab'):
                     for axis in ["x", "y", "zoom", "rotation"]:
@@ -118,25 +127,27 @@ class SettingsManager:
             debug_print("No settings file, applying defaults", 1, debug_level=1)
             self.button_mappings = self.button_presets["Default"].copy()
             if hasattr(self.parent, 'advanced_tab'):
+                self.parent.debug_level_value = 1
                 self.parent.advanced_tab.debug_level.setCurrentIndex(1)
                 self.parent.advanced_tab.polling_slider.setValue(10)
+            else:
+                self.parent.debug_level_value = 1
         self.load_button_preset("Default")
         debug_print("load_settings completed", 1, debug_level=1)
 
     def save_current_settings(self):
-        debug_print("Saving current settings", 1, debug_level=self.parent.debug_level_value)
+        debug_print("Saving current settings", 1, debug_level=getattr(self.parent, 'debug_level_value', 1))
         settings = {
             "button_mappings": self.button_mappings,
             "button_presets": self.button_presets,
             "custom_presets": self.parent.curves_tab.custom_presets if hasattr(self.parent, 'curves_tab') else {},
             "puck_mappings": self.puck_mappings,
-            "puck_modifiers": self.puck_modifiers
         }
         if hasattr(self.parent, 'advanced_tab'):
             settings["debug_level"] = self.parent.advanced_tab.debug_level.currentIndex()
             settings["polling_interval"] = self.parent.advanced_tab.polling_slider.value()
         else:
-            settings["debug_level"] = self.parent.debug_level_value
+            settings["debug_level"] = getattr(self.parent, 'debug_level_value', 1)
             settings["polling_interval"] = 10
 
         for canvas_axis in ["X (Panning Horizontal)", "Y (Panning Vertical)", "Zoom", "Rotation"]:
@@ -147,8 +158,12 @@ class SettingsManager:
             settings[f"{axis_key}_dead_zone"] = self.axis_settings[canvas_axis]["dead_zone"]
             editor = self.parent.curves_tab.curve_editors[canvas_axis.split()[0]] if hasattr(self.parent, 'curves_tab') else None
             settings[f"{axis_key}_curve"] = [[p.x(), p.y()] for p in editor.control_points] if editor else [[0.0, 0.0], [0.25, 0.25], [0.75, 0.75], [1.0, 1.0]]
+
+        for axis in self.sn_axes:
+            if axis in self.axis_settings:
+                settings[f"{axis.lower()}_dead_zone"] = self.axis_settings[axis].get("dead_zone", 130)
         save_settings(settings)
-        debug_print("Settings saved", 1, debug_level=self.parent.debug_level_value)
+        debug_print("Settings saved", 1, debug_level=getattr(self.parent, 'debug_level_value', 1))
 
     def update_button_mapping(self, button_id, action, modifier="None"):
         button_id = str(button_id)
@@ -157,17 +172,17 @@ class SettingsManager:
         index = self.parent.buttons_tab.available_actions.index(action) if action in self.parent.buttons_tab.available_actions else -1
         if index != -1 or action.startswith("BrushPreset:"):
             self.button_mappings[button_id][modifier] = action
-            debug_print(f"Button {button_id} mapped to {modifier}+{action}", 1, debug_level=self.parent.debug_level_value)
+            debug_print(f"Button {button_id} mapped to {modifier}+{action}", 1, debug_level=getattr(self.parent, 'debug_level_value', 1))
         self.save_current_settings()
 
-    def update_puck_mapping(self, axis, value, mapping_type):
-        if mapping_type == "action":
+    def update_puck_mapping(self, axis, value):
+        if isinstance(value, str):
             self.puck_mappings[axis] = value
             if value == "None":
                 for canvas_axis in ["X (Panning Horizontal)", "Y (Panning Vertical)", "Zoom", "Rotation"]:
                     if self.axis_settings[canvas_axis]["binding"] == axis:
                         self.axis_settings[canvas_axis]["binding"] = "None"
-            else:
+            elif value in ["Pan X (Panning Horizontal)", "Pan Y (Panning Vertical)", "Zoom", "Rotation"]:
                 canvas_axis = value.split()[0]
                 if canvas_axis == "Pan" and "Horizontal" in value:
                     canvas_axis = "X"
@@ -179,10 +194,12 @@ class SettingsManager:
                         if ca != full_axis and self.axis_settings[ca]["binding"] == axis:
                             self.axis_settings[ca]["binding"] = "None"
                     self.axis_settings[full_axis]["binding"] = axis
+        elif isinstance(value, dict) and "negative" in value and "positive" in value:
+            self.puck_mappings[axis] = value
         else:
-            self.puck_mappings[axis] = self.puck_mappings.get(axis, "None")
-            self.puck_modifiers[axis] = value
-        debug_print(f"Puck {axis} {mapping_type} updated to {value}", 1, debug_level=self.parent.debug_level_value)
+            debug_print(f"Invalid puck mapping value for {axis}: {value}", 1, debug_level=getattr(self.parent, 'debug_level_value', 1))
+            self.puck_mappings[axis] = "None"
+        debug_print(f"Puck {axis} updated to {value}", 1, debug_level=getattr(self.parent, 'debug_level_value', 1))
         self.save_current_settings()
 
     def save_button_preset(self):
@@ -192,11 +209,11 @@ class SettingsManager:
 
     def save_button_preset_with_name(self, name):
         if name == "Default":
-            debug_print("Cannot overwrite Default preset", 1, debug_level=self.parent.debug_level_value)
+            debug_print("Cannot overwrite Default preset", 1, debug_level=getattr(self.parent, 'debug_level_value', 1))
             return
         self.button_presets[name] = self.button_mappings.copy()
         self.save_current_settings()
-        debug_print(f"Saved button preset: {name}", 1, debug_level=self.parent.debug_level_value)
+        debug_print(f"Saved button preset: {name}", 1, debug_level=getattr(self.parent, 'debug_level_value', 1))
 
     def delete_button_preset(self):
         name = "Default"
@@ -204,15 +221,15 @@ class SettingsManager:
 
     def delete_button_preset_with_name(self, name):
         if name == "Default":
-            debug_print("Cannot delete Default preset", 1, debug_level=self.parent.debug_level_value)
+            debug_print("Cannot delete Default preset", 1, debug_level=getattr(self.parent, 'debug_level_value', 1))
             return
         if name in self.button_presets:
             del self.button_presets[name]
             self.load_button_preset("Default")
             self.save_current_settings()
-            debug_print(f"Deleted button preset: {name}", 1, debug_level=self.parent.debug_level_value)
+            debug_print(f"Deleted button preset: {name}", 1, debug_level=getattr(self.parent, 'debug_level_value', 1))
 
     def load_button_preset(self, name):
         if name in self.button_presets:
             self.button_mappings = self.button_presets[name].copy()
-            debug_print(f"Loaded button preset: {name}", 1, debug_level=self.parent.debug_level_value)
+            debug_print(f"Loaded button preset: {name}", 1, debug_level=getattr(self.parent, 'debug_level_value', 1))

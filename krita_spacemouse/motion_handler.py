@@ -1,3 +1,4 @@
+# motion_handler.py
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QMdiArea, QScrollBar
 from krita import Krita
@@ -15,47 +16,66 @@ def process_motion_event(self, axis_inputs):
     if 0 in self.button_states and self.button_states[0]:
         modifiers |= Qt.ShiftModifier
 
+    triggered_actions = set()  # Track actions to avoid duplicates in one poll cycle
+
     for sm_axis in ["x", "y", "z", "rx", "ry", "rz"]:
         action = docker.settings.puck_mappings.get(sm_axis.upper(), "None")
         if action == "None":
             debug_print(f"Axis {sm_axis} mapped to None, skipping", 2, debug_level=docker.debug_level_value)
             continue
-        canvas_axis = action.split()[0]
-        if canvas_axis == "Pan" and "Horizontal" in action:
-            axis_key = "X"
-        elif canvas_axis == "Pan" and "Vertical" in action:
-            axis_key = "Y"
-        else:
-            axis_key = canvas_axis
 
-        full_axis = f"{axis_key} (Panning Horizontal)" if axis_key == "X" else f"{axis_key} (Panning Vertical)" if axis_key == "Y" else axis_key
-        if full_axis not in docker.settings.axis_settings:
-            debug_print(f"Axis {full_axis} not in axis_settings", 1, debug_level=docker.debug_level_value)
-            continue
-
-        settings = docker.settings.axis_settings[full_axis]
-        sensitivity = settings["sensitivity"]
-        invert = -1 if settings["invert"] else 1
-        dead_zone = settings["dead_zone"]
         raw_input = axis_inputs.get(sm_axis, 0)
 
-        normalized_input = max(0, min(1, (abs(raw_input) - dead_zone) / (max_input - dead_zone))) if abs(raw_input) >= dead_zone else 0
-        try:
-            curve_output = docker.curves_tab.curve_editors[axis_key].get_curve_value(normalized_input)
-        except KeyError:
-            debug_print(f"Curve editor for {axis_key} not found", 1, debug_level=docker.debug_level_value)
-            continue
-        scaled_value = curve_output * max_input * sensitivity * (1 if raw_input >= 0 else -1) * invert
+        if isinstance(action, str) and action in ["Pan X (Panning Horizontal)", "Pan Y (Panning Vertical)", "Zoom", "Rotation"]:
+            canvas_axis = action.split()[0]
+            if canvas_axis == "Pan" and "Horizontal" in action:
+                axis_key = "X"
+            elif canvas_axis == "Pan" and "Vertical" in action:
+                axis_key = "Y"
+            else:
+                axis_key = canvas_axis
 
-        if abs(raw_input) >= dead_zone:
-            if axis_key == "X":
-                dx = int(scaled_value)
-            elif axis_key == "Y":
-                dy = int(scaled_value)
-            elif axis_key == "Zoom":
-                zoom_delta = scaled_value * zoom_scale
-            elif axis_key == "Rotation":
-                rotation_delta = max(min(scaled_value * rotation_scale, 10.0), -10.0)
+            full_axis = f"{axis_key} (Panning Horizontal)" if axis_key == "X" else f"{axis_key} (Panning Vertical)" if axis_key == "Y" else axis_key
+            if full_axis not in docker.settings.axis_settings:
+                debug_print(f"Axis {full_axis} not in axis_settings", 1, debug_level=docker.debug_level_value)
+                continue
+
+            settings = docker.settings.axis_settings[full_axis]
+            sensitivity = settings["sensitivity"]
+            invert = -1 if settings["invert"] else 1
+            dead_zone = settings["dead_zone"]
+            normalized_input = max(0, min(1, (abs(raw_input) - dead_zone) / (max_input - dead_zone))) if abs(raw_input) >= dead_zone else 0
+            try:
+                curve_output = docker.curves_tab.curve_editors[axis_key].get_curve_value(normalized_input)
+            except KeyError:
+                debug_print(f"Curve editor for {axis_key} not found", 1, debug_level=docker.debug_level_value)
+                continue
+            scaled_value = curve_output * max_input * sensitivity * (1 if raw_input >= 0 else -1) * invert
+
+            if abs(raw_input) >= dead_zone:
+                if axis_key == "X":
+                    dx = int(scaled_value)
+                elif axis_key == "Y":
+                    dy = int(scaled_value)
+                elif axis_key == "Zoom":
+                    zoom_delta = scaled_value * zoom_scale
+                elif axis_key == "Rotation":
+                    rotation_delta = max(min(scaled_value * rotation_scale, 10.0), -10.0)
+        elif isinstance(action, dict) and "negative" in action and "positive" in action:
+            dead_zone = docker.settings.axis_settings.get(sm_axis.upper(), {}).get("dead_zone", 130)
+            if abs(raw_input) >= dead_zone:
+                action_name = action["negative"] if raw_input < 0 else action["positive"]
+                if action_name != "None" and action_name not in triggered_actions:
+                    qaction = Krita.instance().action(action_name)
+                    if qaction:
+                        qaction.trigger()
+                        triggered_actions.add(action_name)
+                        debug_print(f"Triggered Krita action '{action_name}' on {sm_axis} (input={raw_input})", 1, debug_level=docker.debug_level_value)
+                        libspnav.spnav_remove_events(SPNAV_EVENT_MOTION)
+                    else:
+                        debug_print(f"Krita action '{action_name}' not found", 1, debug_level=docker.debug_level_value)
+        else:
+            debug_print(f"Invalid puck mapping for {sm_axis}: {action}", 1, debug_level=docker.debug_level_value)
 
     qwin = Krita.instance().activeWindow().qwindow()
     subwindow = qwin.findChild(QMdiArea).currentSubWindow()
