@@ -49,22 +49,23 @@ class SpacenavDocker(QDockWidget):
         self.axis_settings_container.setLayout(QVBoxLayout())
         self.axis_settings_container.setVisible(False)
 
-        self.curves_tab = CurvesTab(self)
-        debug_print("Step 5: CurvesTab initialized", 1, debug_level=self.debug_level_value)
+
         print("[PRE-INIT 5] Before ButtonsTab")
         self.buttons_tab = ButtonsTab(self)
-        debug_print("Step 6: ButtonsTab initialized", 1, debug_level=self.debug_level_value)
+        debug_print("Step 5: ButtonsTab initialized", 1, debug_level=self.debug_level_value)
+        self.curves_tab = CurvesTab(self)
+        debug_print("Step 6: CurvesTab initialized", 1, debug_level=self.debug_level_value)
         self.advanced_tab = AdvancedTab(self)
         debug_print("Step 7: AdvancedTab initialized", 1, debug_level=self.debug_level_value)
-        self.log_tab = LogTab(self)
         print("[PRE-INIT 6] LogTab initialized")
+        self.log_tab = LogTab(self)
         debug_print("Step 8: LogTab initialized", 1, debug_level=self.debug_level_value)
 
         self.config_dialogs = ConfigDialogs(self)
         debug_print("Step 9: ConfigDialogs initialized", 1, debug_level=self.debug_level_value)
 
-        self.tabs.addTab(self.curves_tab, "Curves")
         self.tabs.addTab(self.buttons_tab, "Buttons")
+        self.tabs.addTab(self.curves_tab, "Curves")
         self.tabs.addTab(self.advanced_tab, "Advanced")
         self.tabs.addTab(self.log_tab, "Log")
         debug_print("Step 10: Tabs added to QTabWidget", 1, debug_level=self.debug_level_value)
