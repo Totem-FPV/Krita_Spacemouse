@@ -7,7 +7,6 @@ from krita_spacemouse.button_handler import process_button_event
 from krita_spacemouse.motion_handler import process_motion_event
 import ctypes
 from time import time
-import os
 
 def poll_spacenav(self):
     try:
@@ -76,19 +75,3 @@ def poll_spacenav(self):
         debug_print(f"Unexpected error in poll: {e}", 1, debug_level=self.docker.debug_level_value if self.docker else 1)
         self.timer.stop()
 
-def update_lcd_buttons(self):
-    try:
-        if not self.docker or not self.lcd_fd:
-            return
-        mappings = self.docker.settings.button_mappings
-        lines = [f"{i}: {mappings.get(str(i), {'None': 'None'}).get('None', 'None')[:10]}" for i in range(12)]
-        svg_text = "\n".join(f'<text x="10" y="{30 + i*20}" font-size="18" fill="white">{line}</text>' for i, line in enumerate(lines))
-        svg = f"""<svg width="320" height="240" xmlns="http://www.w3.org/2000/svg">
-                    <rect x="0" y="0" width="320" height="240" fill="black"/>
-                    {svg_text}
-                  </svg>""".encode()
-        packet = bytearray([0x03]) + svg[:63] + b'\x00' * (64 - len(svg[:63]))
-        os.write(self.lcd_fd, packet)
-        debug_print("LCD: Updated buttons 0-11", 1, debug_level=self.docker.debug_level_value if self.docker else 1)
-    except OSError as e:
-        debug_print(f"LCD write failed: {e}", 1, debug_level=self.docker.debug_level_value if self.docker else 1)
