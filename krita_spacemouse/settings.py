@@ -10,7 +10,7 @@ class SettingsManager:
         self.button_mappings = {}
         self.button_presets = {
             "Default": {
-                "0": {"None": "view_zoom_in"}, "1": {"None": "view_zoom_out"}, "2": {"None": "edit_undo"}, "3": {"None": "edit_redo"},
+                "0": {"None": "edit_undo"}, "1": {"None": "edit_redo"}, "2": {"None": "view_zoom_in"}, "3": {"None": "view_zoom_out"},
                 "4": {"None": "KritaShape/KisToolBrush"}, "5": {"None": "erase_action"}, "6": {"None": "increase_brush_size"},
                 "7": {"None": "decrease_brush_size"}, "8": {"None": "previous_preset"}, "9": {"None": "KritaFill/KisToolFill"},
                 "10": {"None": "KritaTransform/KisToolMove"}, "11": {"None": "deselect"}, "12": {"None": "toggle_assistant"},
@@ -18,9 +18,8 @@ class SettingsManager:
                 "16": {"None": "rotate_canvas_left"}, "17": {"None": "rotate_canvas_right"}, "18": {"None": "invert_selection"},
                 "19": {"None": "Alt"}, "20": {"None": "Shift"}, "21": {"None": "Ctrl"}, "22": {"None": "lock_both", "Shift": "lock_rotation", "Ctrl": "lock_zoom"},
                 "23": {"None": "select_all"}, "24": {"None": "edit_cut"}, "25": {"None": "KisToolSelectRectangular"},
-                "26": {"None": "swapForegroundBackground"}, "27": {"None": "recall_view_1", "Shift": "store_view_1"},
-                "28": {"None": "recall_view_2", "Shift": "store_view_2"}, "29": {"None": "recall_view_3", "Shift": "store_view_3"},
-                "30": {"None": "zoom_to_100pct"}
+                "26": {"None": "swapForegroundBackground"}, "27": {"None": "recall_view_1", "Long": "store_view_1"}, "28": {"None": "recall_view_2", "Long": "store_view_2"}, "29": {"None": "recall_view_3", "Long": "store_view_3"},
+                "30": {"None": "zoom_to_fit"}
             }
         }
         self.puck_mappings = {
@@ -137,6 +136,10 @@ class SettingsManager:
                     self.parent.curves_tab.custom_presets = settings.get("custom_presets", {})
                     self.parent.curves_tab.preset_selector.addItems(self.parent.curves_tab.custom_presets.keys())
 
+                if "long_press_duration" in settings:
+                    self.parent.advanced_tab.long_press_slider.setValue(settings["long_press_duration"])
+                    self.parent.advanced_tab.long_press_label.setText(f"Long Press Duration: {settings['long_press_duration']}ms")
+
                 debug_print("Settings applied successfully", 1, debug_level=1)
             except Exception as e:
                 debug_print(f"Error applying settings: {e}", 1, debug_level=1)
@@ -162,6 +165,7 @@ class SettingsManager:
             "button_presets": self.button_presets,
             "custom_presets": self.parent.curves_tab.custom_presets if hasattr(self.parent, 'curves_tab') else {},
             "puck_mappings": self.puck_mappings,
+            "long_press_duration": self.parent.advanced_tab.long_press_slider.value()
         }
         if hasattr(self.parent, 'advanced_tab'):
             settings["debug_level"] = self.parent.advanced_tab.debug_level.currentIndex()

@@ -50,6 +50,17 @@ class AdvancedTab(QWidget):
         self.reset_button = QPushButton("Reset to Defaults")
         self.reset_button.setToolTip("Restore polling rate, dead zone, sensitivity, and debug level to default values")
         self.reset_button.clicked.connect(self.reset_to_defaults)
+        # Add Long Press functionality
+        self.long_press_slider = QSlider(Qt.Horizontal)
+        self.long_press_slider.setToolTip("Set duration for a button press to count as long press")
+        self.long_press_slider.setMinimum(100)  # 100ms
+        self.long_press_slider.setMaximum(2000)  # 2s
+        self.long_press_slider.setValue(500)  # Default 500ms
+        self.long_press_slider.valueChanged.connect(self.update_long_press_duration)
+        self.long_press_label = QLabel(f"Long Press Duration: {self.long_press_slider.value()}ms")
+        self.layout.addWidget(self.long_press_label)
+        self.layout.addWidget(self.long_press_slider)
+        self.layout.addStretch()
         self.layout.addWidget(self.reset_button)
 
         self.layout.addStretch()
@@ -66,6 +77,17 @@ class AdvancedTab(QWidget):
         self.sensitivity_label.setText(f"Global Sensitivity: {value}%")
         self.parent.save_current_settings()
         debug_print(f"Global sensitivity set to {value}%", 1, debug_level=self.parent.debug_level_value)
+
+    def update_long_press_duration(self, value):
+        self.long_press_label.setText(f"Long Press Duration: {value}ms")
+        self.parent.long_press_duration = value  # Store in docker
+        self.parent.save_current_settings()
+        debug_print(f"Long press duration set to {value}ms", 1, debug_level=self.parent.debug_level_value)
+
+    def reset_to_defaults(self):
+        # ... existing reset ...
+        self.long_press_slider.setValue(500)
+        self.long_press_label.setText(f"Long Press Duration: 500ms")
 
     def reset_to_defaults(self):
         # Set UI elements to default values

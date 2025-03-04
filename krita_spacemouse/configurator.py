@@ -48,7 +48,7 @@ class ConfigDialogs:
         default_layout.addWidget(default_btn)
         layout.addLayout(default_layout)
 
-        for modifier in ["Ctrl", "Alt", "Shift", "Super", "Meta"]:
+        for modifier in ["Ctrl", "Alt", "Shift", "Super", "Meta", "Long"]:  # Added "Long"
             mod_layout = QHBoxLayout()
             mod_label = QLabel(f"{modifier}+Action:")
             mod_action = mapped_actions.get(modifier, "None")
@@ -403,10 +403,13 @@ class ConfigDialogs:
                     "Scripts": ["ai_", "python_", "ten_"],
                     "SVG Tools": ["svg_"],
                     "Tools": ["tool_", "kis_tool"],
-                    "View": ["store_view_", "recall_view_", "lock_"],
+                    "View": ["store_view_", "recall_view_", "lock_", "view_zoom", "zoom_to", "reset_canvas", "mirror", "rotate_canvas", "show"],
                     "Modifiers": ["Shift", "Ctrl", "Alt", "Super", "Meta"],
+                    "Edit": ["edit_undo", "edit_redo", "edit_cut", "edit_copy", "edit_paste"],
+                    "Selection": ["select_", "deselect", "invert_selection"],
                     "Other": []
                 }
+
                 action_menus = {}
                 for cat in categories:
                     submenu = menu.addMenu(cat)
