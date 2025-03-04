@@ -1,5 +1,5 @@
 # Krita SpaceMouse Plugin
-![Krita SpaceMouse](krita_spacemouse/images/Krita_Spacemouse_Full_View.png)
+![Krita SpaceMouse](krita_spacemouse/images/Buttons_Tab.png)
 
 A feature-rich plugin integrating SpaceMouse (especially Enterprise) with Krita on Linux, eliminating the keyboard for a streamlined art workflow.
 
