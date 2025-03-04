@@ -4,7 +4,7 @@ from PyQt5.QtGui import QPixmap, QMouseEvent, QPen, QColor, QPainter
 from PyQt5.QtCore import Qt, QRectF, QEvent
 from krita import Krita
 from ..utils import debug_print
-from ..configurator import SavePresetDialog
+from ..preset_dialog import SavePresetDialog  # Updated import
 from .curves_tab import CurvesTab
 import os
 

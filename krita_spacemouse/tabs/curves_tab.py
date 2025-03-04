@@ -1,7 +1,8 @@
+# curves_tab.py
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QComboBox, QLabel, QHBoxLayout, QPushButton
 from PyQt5.QtCore import QPointF
 from ..curves import BezierCurveEditor
-from ..configurator import SavePresetDialog  # Changed from config_dialogs
+from ..preset_dialog import SavePresetDialog  # Updated import
 from ..utils import debug_print
 
 class CurvesTab(QWidget):
