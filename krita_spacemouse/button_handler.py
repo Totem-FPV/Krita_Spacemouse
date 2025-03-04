@@ -51,16 +51,19 @@ def process_button_event(self, button_id, press_state):
             debug_print("No active view for button action", 1, debug_level=docker.debug_level_value)
             return
 
-        if action_name.startswith("BrushPreset:"):
+        elif action_name.startswith("BrushPreset:"):
             preset_name = action_name.split(":", 1)[1]
             resources = Krita.instance().resources("preset")
             preset = resources.get(preset_name, None)
             if preset:
-                view.setBrushPreset(preset)
-                self.recent_presets.append(preset_name)
-                if len(self.recent_presets) > 2:
-                    self.recent_presets.pop(0)
-                debug_print(f"Applied brush preset: {preset_name}", 1, debug_level=docker.debug_level_value)
+                try:
+                    view.setCurrentBrushPreset(preset)  # Updated method
+                    self.recent_presets.append(preset_name)
+                    if len(self.recent_presets) > 2:
+                        self.recent_presets.pop(0)
+                    debug_print(f"Applied brush preset: {preset_name}", 1, debug_level=docker.debug_level_value)
+                except AttributeError:
+                    debug_print(f"Failed to set brush preset '{preset_name}' - API method not available", 1, debug_level=docker.debug_level_value)
             else:
                 debug_print(f"Brush preset not found: {preset_name}", 1, debug_level=docker.debug_level_value)
 

@@ -2,8 +2,8 @@
 from PyQt5.QtWidgets import QDockWidget, QWidget, QVBoxLayout, QTabWidget, QApplication
 from PyQt5.QtCore import Qt  # Added this import
 from krita import Krita
-from .tabs.curves_tab import CurvesTab
 from .tabs.buttons_tab import ButtonsTab
+from .tabs.curves_tab import CurvesTab
 from .tabs.advanced_tab import AdvancedTab
 from .tabs.log_tab import LogTab
 from .configurator import ConfigDialogs
@@ -57,7 +57,7 @@ class SpacenavDocker(QDockWidget):
         debug_print("Step 6: CurvesTab initialized", 1, debug_level=self.debug_level_value)
         self.advanced_tab = AdvancedTab(self)
         debug_print("Step 7: AdvancedTab initialized", 1, debug_level=self.debug_level_value)
-        print("[PRE-INIT 6] LogTab initialized")
+        print("[PRE-INIT 8] LogTab initialized")
         self.log_tab = LogTab(self)
         debug_print("Step 8: LogTab initialized", 1, debug_level=self.debug_level_value)
 
