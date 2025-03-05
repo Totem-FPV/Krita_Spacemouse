@@ -6,21 +6,21 @@ from .utils import debug_print
 import time
 import pyautogui
 
+# Modifier mapping for SpaceMouse buttons
+modifier_map = {
+    "Shift": 20,
+    "Ctrl": 21,
+    "Alt": 19,
+    "Super": None,
+    "Meta": None
+}
+
 def process_button_event(self, button_id, press_state):
     docker = self.docker
     debug_print(f"Button event - ID={button_id}, Press={press_state}", 1, debug_level=docker.debug_level_value)
     mappings = docker.settings.button_mappings.get(str(button_id), {"None": "None"})
     if isinstance(mappings, str):
         mappings = {"None": mappings}
-
-    # Map modifier strings to Qt enums for consistency (though pyautogui uses strings)
-    modifier_map = {
-        "Shift": Qt.ShiftModifier,
-        "Ctrl": Qt.ControlModifier,
-        "Alt": Qt.AltModifier,
-        "Super": Qt.Key_Super_L,
-        "Meta": Qt.MetaModifier
-    }
 
     # Initialize button press tracking if not present
     if not hasattr(self, 'button_press_times'):
@@ -33,23 +33,31 @@ def process_button_event(self, button_id, press_state):
     try:
         self.long_press_timer.timeout.disconnect()
     except TypeError:
-        pass  # No previous connection, safe to ignore
+        pass
     self.long_press_timer.timeout.connect(lambda: handle_long_press(self, button_id))
 
-    # Get long press duration from docker (default 500ms)
-    long_press_duration = getattr(docker, 'long_press_duration', 500)
+    # Handle modifier passthrough
+    for mod, mod_button in modifier_map.items():
+        if mod_button == button_id:
+            self.modifier_states[mod] = press_state
+            if press_state:
+                pyautogui.keyDown(mod.lower())
+                debug_print(f"{mod} modifier pressed via button {button_id}", 1, debug_level=docker.debug_level_value)
+            else:
+                pyautogui.keyUp(mod.lower())
+                debug_print(f"{mod} modifier released via button {button_id}", 1, debug_level=docker.debug_level_value)
 
-    if press_state:  # Button pressed
-        self.button_press_times[button_id] = time.time() * 1000  # Store start time in ms
+    long_press_duration = getattr(docker, 'long_press_duration', 500)
+    if press_state:
+        self.button_press_times[button_id] = time.time() * 1000
         self.long_press_timer.start(long_press_duration)
-    else:  # Button released
+    else:
         if button_id in self.button_press_times:
             press_duration = (time.time() * 1000) - self.button_press_times[button_id]
             del self.button_press_times[button_id]
             self.long_press_timer.stop()
             if press_duration < long_press_duration:
                 handle_short_press(self, button_id, mappings)
-            # Long press is handled by timer if it fires
 
 def handle_short_press(self, button_id, mappings):
     active_modifier = "None"
@@ -57,7 +65,6 @@ def handle_short_press(self, button_id, mappings):
         if state and mod in ["Shift", "Ctrl", "Alt", "Super", "Meta"]:
             active_modifier = mod
             break
-
     action_name = mappings.get(active_modifier, mappings.get("None", "None"))
     debug_print(f"Short press mapped: {active_modifier}+{action_name}", 1, debug_level=self.docker.debug_level_value)
     execute_action(self, button_id, action_name, self.docker.debug_level_value)
@@ -70,23 +77,8 @@ def handle_long_press(self, button_id):
         execute_action(self, button_id, action_name, self.docker.debug_level_value)
 
 def execute_action(self, button_id, action_name, debug_level):
-    modifier_map = {
-        "Shift": "shift",
-        "Ctrl": "ctrl",
-        "Alt": "alt",
-        "Super": "super",
-        "Meta": "meta"
-    }
     if action_name in modifier_map:
-        key = modifier_map[action_name]
-        if action_name not in self.modifier_states or self.modifier_states[action_name] != (action_name in self.button_press_times):
-            if action_name in self.button_press_times:
-                pyautogui.keyDown(key)
-            else:
-                pyautogui.keyUp(key)
-            self.modifier_states[action_name] = action_name in self.button_press_times
-            debug_print(f"Modifier {action_name} {'down' if action_name in self.button_press_times else 'up'}", 4, debug_level=debug_level)
-        return
+        return  # Handled in process_button_event
 
     if action_name != "None":
         view = Krita.instance().activeWindow().activeView()
@@ -99,14 +91,11 @@ def execute_action(self, button_id, action_name, debug_level):
             resources = Krita.instance().resources("preset")
             preset = resources.get(preset_name, None)
             if preset:
-                try:
-                    view.setCurrentBrushPreset(preset)
-                    self.recent_presets.append(preset_name)
-                    if len(self.recent_presets) > 2:
-                        self.recent_presets.pop(0)
-                    debug_print(f"Applied brush preset: {preset_name}", 1, debug_level=debug_level)
-                except AttributeError:
-                    debug_print(f"Failed to set brush preset '{preset_name}' - API method not available", 1, debug_level=debug_level)
+                view.setCurrentBrushPreset(preset)
+                self.recent_presets.append(preset_name)
+                if len(self.recent_presets) > 2:
+                    self.recent_presets.pop(0)
+                debug_print(f"Applied brush preset: {preset_name}", 1, debug_level=debug_level)
             else:
                 debug_print(f"Brush preset not found: {preset_name}", 1, debug_level=debug_level)
 
@@ -145,14 +134,14 @@ def execute_action(self, button_id, action_name, debug_level):
             if action_name.startswith("store_view_"):
                 x = hscroll.value()
                 y = vscroll.value()
-                zoom = canvas.zoomLevel()
+                zoom = canvas.zoomLevel()  # Store raw zoom
                 rotation = canvas.rotation()
                 self.view_states[view_key] = (x, y, zoom, rotation)
                 debug_print(f"Stored view {view_key}: x={x}, y={y}, zoom={zoom}, rotation={rotation}", 1, debug_level=debug_level)
             elif action_name.startswith("recall_view_"):
                 if self.view_states.get(view_key):
                     x, y, zoom, rotation = self.view_states[view_key]
-                    canvas.setZoomLevel(zoom / ZOOM_SCALE_FACTOR)
+                    canvas.setZoomLevel(zoom / ZOOM_SCALE_FACTOR)  # Scale on recall
                     QApplication.processEvents()
                     canvas.setRotation(rotation)
                     hscroll.setValue(x)
