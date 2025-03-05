@@ -4,7 +4,7 @@ from PyQt5.QtGui import QPixmap, QMouseEvent, QPen, QColor, QPainter
 from PyQt5.QtCore import Qt, QRectF, QEvent
 from krita import Krita
 from ..utils import debug_print
-from ..preset_dialog import SavePresetDialog  # Updated import
+from ..preset_dialog import SavePresetDialog
 from .curves_tab import CurvesTab
 import os
 
@@ -140,7 +140,7 @@ class ButtonsTab(QWidget):
                         btn_id_str = str(button_id)
                         mappings = self.parent.settings.button_mappings.get(btn_id_str, {"None": "None"}) if self.parent.settings else {"None": "None"}
                         tooltip = f"{self.button_labels_map[btn_id_str]}:\n"
-                        for mod in ["None", "Shift", "Ctrl", "Alt"]:
+                        for mod in ["None", "Shift", "Ctrl", "Alt", "Super", "Meta", "Long"]:  # Added "Long"
                             action = mappings.get(mod, "None")
                             if action != "None":
                                 tooltip += f"{mod}: {action}\n"
