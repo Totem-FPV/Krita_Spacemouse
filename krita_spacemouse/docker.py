@@ -1,6 +1,6 @@
 # docker.py
 from PyQt5.QtWidgets import QDockWidget, QWidget, QVBoxLayout, QTabWidget, QApplication
-from PyQt5.QtCore import Qt  # Added this import
+from PyQt5.QtCore import Qt
 from krita import Krita
 from .tabs.buttons_tab import ButtonsTab
 from .tabs.curves_tab import CurvesTab
@@ -22,13 +22,12 @@ class SpacenavDocker(QDockWidget):
         self.layout = QVBoxLayout()
         self.widget.setLayout(self.layout)
 
-        # Enable tooltips application-wide
         QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
         QApplication.instance().setAttribute(Qt.AA_UseHighDpiPixmaps)
-        self.setAttribute(Qt.WA_Hover, True)  # Ensure hover events for tooltips
+        self.setAttribute(Qt.WA_Hover, True)
 
-        self.debug_level_value = 1  # Set early default
-        self.long_press_duration = 500  # Default long press duration in ms
+        self.debug_level_value = 1
+        self.long_press_duration = 500
         print("[PRE-INIT 2] debug_level_value set")
         debug_print("Step 2: debug_level_value set", 1, debug_level=self.debug_level_value)
 
@@ -71,7 +70,7 @@ class SpacenavDocker(QDockWidget):
         debug_print("Step 10: Tabs added to QTabWidget", 1, debug_level=self.debug_level_value)
 
         if self.settings:
-            self.load_settings()  # Load settings including long_press_duration
+            self.load_settings()
             debug_print("Settings loaded after initialization", 1, debug_level=self.debug_level_value)
         else:
             debug_print("Settings not initialized, using default debug level and long press duration", 1, debug_level=self.debug_level_value)
@@ -125,13 +124,22 @@ class SpacenavDocker(QDockWidget):
         if self.settings:
             settings = self.settings.load_settings()
             if settings:
-                # Update debug_level_value from settings if available
                 if "debug_level" in settings:
                     self.debug_level_value = settings["debug_level"]
                     self.advanced_tab.debug_level.setCurrentIndex(self.debug_level_value)
-                # Load long_press_duration if available
-                if "long_press_duration" in settings:
-                    self.long_press_duration = settings["long_press_duration"]
+                if hasattr(self, 'extension'):
+                    polling_interval = self.extension.polling_interval
+                    self.advanced_tab.polling_slider.setValue(polling_interval)
+                    self.advanced_tab.polling_label.setText(f"Polling Rate: {polling_interval}ms ({1000/polling_interval:.1f}Hz)")
+                    self.extension.timer.stop()
+                    self.extension.timer.start(polling_interval)
+                    self.dead_zone_slider_value = self.extension.global_dead_zone
+                    self.advanced_tab.dead_zone_slider.setValue(self.dead_zone_slider_value)
+                    self.advanced_tab.dead_zone_label.setText(f"Global Dead Zone: {self.dead_zone_slider_value}")
+                    self.sensitivity_slider_value = self.extension.global_sensitivity
+                    self.advanced_tab.sensitivity_slider.setValue(self.sensitivity_slider_value)
+                    self.advanced_tab.sensitivity_label.setText(f"Global Sensitivity: {self.sensitivity_slider_value}%")
+                    self.long_press_duration = self.extension.long_press_duration
                     self.advanced_tab.long_press_slider.setValue(self.long_press_duration)
                     self.advanced_tab.long_press_label.setText(f"Long Press Duration: {self.long_press_duration}ms")
                 debug_print("Settings loaded from file", 1, debug_level=self.debug_level_value)
@@ -142,6 +150,18 @@ class SpacenavDocker(QDockWidget):
                 self.advanced_tab.debug_level.setCurrentIndex(1)
                 self.advanced_tab.long_press_slider.setValue(500)
                 self.advanced_tab.long_press_label.setText(f"Long Press Duration: 500ms")
+                if hasattr(self, 'extension'):
+                    self.extension.polling_interval = 10
+                    self.extension.timer.stop()
+                    self.extension.timer.start(10)
+                    self.advanced_tab.polling_slider.setValue(10)
+                    self.advanced_tab.polling_label.setText(f"Polling Rate: 10ms ({1000/10:.1f}Hz)")
+                    self.dead_zone_slider_value = 130
+                    self.advanced_tab.dead_zone_slider.setValue(130)
+                    self.advanced_tab.dead_zone_label.setText(f"Global Dead Zone: 130")
+                    self.sensitivity_slider_value = 100
+                    self.advanced_tab.sensitivity_slider.setValue(100)
+                    self.advanced_tab.sensitivity_label.setText(f"Global Sensitivity: 100%")
         else:
             debug_print("Settings not initialized, using defaults", 1, debug_level=self.debug_level_value)
 

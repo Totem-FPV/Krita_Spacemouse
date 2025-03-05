@@ -26,15 +26,16 @@ class SpacenavControlExtension(Extension):
         self.modifier_states = {"Shift": False, "Ctrl": False, "Alt": False}
         self.recent_presets = []
         self.view_states = {"V1": None, "V2": None, "V3": None}  # (x, y, zoom, rotation)
-        self.lock_rotation = False  # New lock flags
+        self.lock_rotation = False
         self.lock_zoom = False
-        # Set default debug_level_value early
         self.debug_level_value = 1
-        # Load polling interval from settings or default to 10ms
         from .settings import SettingsManager
         settings_manager = SettingsManager(self, load=False)  # Temp instance to peek at settings
         settings = settings_manager.load_settings()
         self.polling_interval = settings.get("polling_interval", 10) if settings else 10
+        self.global_dead_zone = settings.get("global_dead_zone", 130) if settings else 130
+        self.global_sensitivity = settings.get("global_sensitivity", 100) if settings else 100
+        self.long_press_duration = settings.get("long_press_duration", 500) if settings else 500
         debug_print(f"SpacenavControlExtension initialized with polling_interval={self.polling_interval}ms", 1, debug_level=self.debug_level_value)
 
     def setup(self):
@@ -50,7 +51,7 @@ class SpacenavControlExtension(Extension):
         debug_print("Connected to SpaceNavigator daemon", 1, debug_level=self.docker.debug_level_value if self.docker else self.debug_level_value)
         cleared = libspnav.spnav_remove_events(SPNAV_EVENT_MOTION)
         debug_print(f"Initial queue clear: {cleared} motion events", 1, debug_level=self.docker.debug_level_value if self.docker else self.debug_level_value)
-        self.timer.start(self.polling_interval)  # Use loaded/default polling interval
+        self.timer.start(self.polling_interval)
 
         try:
             Krita.instance().addDockWidgetFactory(
@@ -83,7 +84,6 @@ class SpacenavControlExtension(Extension):
         except Exception as e:
             debug_print(f"Error in stop: {e}", 1, debug_level=self.docker.debug_level_value if self.docker else self.debug_level_value)
 
-    # New lock toggle methods
     def toggle_lock_rotation(self):
         self.lock_rotation = not self.lock_rotation
         debug_print(f"Rotation lock {'enabled' if self.lock_rotation else 'disabled'}", 1, debug_level=self.docker.debug_level_value if self.docker else self.debug_level_value)
