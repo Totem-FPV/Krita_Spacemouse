@@ -56,7 +56,7 @@ class SpacenavControlExtension(Extension):
                 break
 
         if not socket_path:
-            QMessageBox.warning(None, "SpaceMouse Error", "No SpaceMouse socket found. Check if spacenavd
+            QMessageBox.warning(None, "SpaceMouse Error", "No SpaceMouse socket found. Check if spacenavd is running.")
             debug_print("Error: No SpaceMouse socket found at common locations (/var/run/spnav.sock, /tmp/.spnav.sock, XDG_RUNTIME_DIR/spnav.sock, or SPNAV_SOCKPATH)", 1, debug_level=self.docker.debug_level_value if self.docker else self.debug_level_value)
             return  # Skip SpaceMouse setup but don’t crash
 
