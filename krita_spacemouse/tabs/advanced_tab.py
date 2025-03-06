@@ -1,5 +1,5 @@
 # tabs/advanced_tab.py
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QComboBox, QLabel, QSlider, QPushButton  # Add QPushButton
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QComboBox, QLabel, QSlider, QPushButton
 from PyQt5.QtCore import Qt
 from ..utils import debug_print
 
@@ -46,11 +46,6 @@ class AdvancedTab(QWidget):
         self.layout.addWidget(self.sensitivity_label)
         self.layout.addWidget(self.sensitivity_slider)
 
-        # Add Reset to Defaults button
-        self.reset_button = QPushButton("Reset to Defaults")
-        self.reset_button.setToolTip("Restore polling rate, dead zone, sensitivity, and debug level to default values")
-        self.reset_button.clicked.connect(self.reset_to_defaults)
-        # Add Long Press functionality
         self.long_press_slider = QSlider(Qt.Horizontal)
         self.long_press_slider.setToolTip("Set duration for a button press to count as long press")
         self.long_press_slider.setMinimum(100)  # 100ms
@@ -60,7 +55,10 @@ class AdvancedTab(QWidget):
         self.long_press_label = QLabel(f"Long Press Duration: {self.long_press_slider.value()}ms")
         self.layout.addWidget(self.long_press_label)
         self.layout.addWidget(self.long_press_slider)
-        self.layout.addStretch()
+
+        self.reset_button = QPushButton("Reset to Defaults")
+        self.reset_button.setToolTip("Restore polling rate, dead zone, sensitivity, debug level, and long press to defaults")
+        self.reset_button.clicked.connect(self.reset_to_defaults)
         self.layout.addWidget(self.reset_button)
 
         self.layout.addStretch()
@@ -85,11 +83,6 @@ class AdvancedTab(QWidget):
         debug_print(f"Long press duration set to {value}ms", 1, debug_level=self.parent.debug_level_value)
 
     def reset_to_defaults(self):
-        # ... existing reset ...
-        self.long_press_slider.setValue(500)
-        self.long_press_label.setText(f"Long Press Duration: 500ms")
-
-    def reset_to_defaults(self):
         # Set UI elements to default values
         self.polling_slider.setValue(10)
         self.polling_label.setText(f"Polling Rate: 10ms ({1000/10:.1f}Hz)")
@@ -98,6 +91,8 @@ class AdvancedTab(QWidget):
         self.sensitivity_slider.setValue(100)
         self.sensitivity_label.setText(f"Global Sensitivity: 100%")
         self.debug_level.setCurrentIndex(1)  # "1 - Minimal"
+        self.long_press_slider.setValue(500)
+        self.long_press_label.setText(f"Long Press Duration: 500ms")
 
         # Update extension polling timer
         if hasattr(self.parent, 'extension'):

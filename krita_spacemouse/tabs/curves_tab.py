@@ -2,7 +2,7 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QComboBox, QLabel, QHBoxLayout, QPushButton
 from PyQt5.QtCore import QPointF
 from ..curves import BezierCurveEditor
-from ..preset_dialog import SavePresetDialog  # Updated import
+from ..preset_dialog import SavePresetDialog
 from ..utils import debug_print
 
 class CurvesTab(QWidget):
@@ -108,18 +108,3 @@ class CurvesTab(QWidget):
             self.preset_selector.setCurrentText("Custom (Current)")
             self.parent.save_current_settings()
             debug_print(f"Deleted custom preset '{preset_name}'", 1, debug_level=self.parent.debug_level_value)
-
-    def update_curve(self):
-        t = np.linspace(0, 1, 100)
-        x = [cubic_bezier(ti, self.control_points[0].x(), self.control_points[1].x(),
-                          self.control_points[2].x(), self.control_points[3].x()) for ti in t]
-        y = [cubic_bezier(ti, self.control_points[0].y(), self.control_points[1].y(),
-                          self.control_points[2].y(), self.control_points[3].y()) for ti in t]
-        self.curve.setData(x, y)
-        self.control_lines.setData(
-            [p.x() for p in self.control_points],
-            [p.y() for p in self.control_points]
-        )
-        for i, item in enumerate(self.control_points_items):
-            item.setData([self.control_points[i].x()], [self.control_points[i].y()])
-        self.plot.update()  # Force UI refresh

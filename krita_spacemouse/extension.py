@@ -1,6 +1,6 @@
 # extension.py
 from PyQt5.QtCore import QTimer, Qt
-from PyQt5.QtWidgets import QApplication, QScrollBar, QMdiArea, QDockWidget
+from PyQt5.QtWidgets import QApplication, QScrollBar, QMdiArea, QDockWidget, QMessageBox
 from krita import Extension, Krita, DockWidgetFactory, DockWidgetFactoryBase
 from .spnav import libspnav, SpnavEventWrapper, SPNAV_EVENT_BUTTON, SPNAV_EVENT_MOTION
 from .docker import SpacenavDocker
@@ -40,13 +40,31 @@ class SpacenavControlExtension(Extension):
 
     def setup(self):
         debug_print("SpacenavControlExtension: Setting up...", 1, debug_level=self.docker.debug_level_value if self.docker else self.debug_level_value)
-        socket_path = "/var/run/spnav.sock"
-        if not os.path.exists(socket_path):
-            debug_print(f"Error: Socket {socket_path} not found.", 1, debug_level=self.docker.debug_level_value if self.docker else self.debug_level_value)
-            return
+
+        # Dynamic socket detection
+        possible_socket_paths = [
+            "/var/run/spnav.sock",          # Arch Linux default
+            "/tmp/.spnav.sock",             # Common on other distros
+            os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "spnav.sock"),  # XDG fallback
+            os.environ.get("SPNAV_SOCKPATH")  # Custom env var, if set
+        ]
+        socket_path = None
+        for path in possible_socket_paths:
+            if path and os.path.exists(path):
+                socket_path = path
+                debug_print(f"SpaceMouse socket found at {socket_path}", 1, debug_level=self.docker.debug_level_value if self.docker else self.debug_level_value)
+                break
+
+        if not socket_path:
+            QMessageBox.warning(None, "SpaceMouse Error", "No SpaceMouse socket found. Check if spacenavd
+            debug_print("Error: No SpaceMouse socket found at common locations (/var/run/spnav.sock, /tmp/.spnav.sock, XDG_RUNTIME_DIR/spnav.sock, or SPNAV_SOCKPATH)", 1, debug_level=self.docker.debug_level_value if self.docker else self.debug_level_value)
+            return  # Skip SpaceMouse setup but don’t crash
+
+        # Set the socket path for libspnav (if needed, depends on implementation)
+        # Note: libspnav typically uses X11 or autodetects; we assume it checks the socket
         result = libspnav.spnav_open()
         if result == -1:
-            debug_print("Error: Failed to connect to SpaceNavigator daemon", 1, debug_level=self.docker.debug_level_value if self.docker else self.debug_level_value)
+            debug_print(f"Error: Failed to connect to SpaceNavigator daemon at {socket_path}", 1, debug_level=self.docker.debug_level_value if self.docker else self.debug_level_value)
             return
         debug_print("Connected to SpaceNavigator daemon", 1, debug_level=self.docker.debug_level_value if self.docker else self.debug_level_value)
         cleared = libspnav.spnav_remove_events(SPNAV_EVENT_MOTION)
